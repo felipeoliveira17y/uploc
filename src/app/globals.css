@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  /* Cinza um pouco menos escuro */
+  --color-uploc-bg: #1a1a1a; 
+  --color-uploc-card: #242424;
+  --color-uploc-gold: #C5A059;
+  --color-uploc-gold-hover: #A68546;
+  --color-uploc-input: #2d2d2d;
+  --color-uploc-text: #e5e5e5;
+
+  /* Animação Customizada */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  --animate-fade-up: fade-up 0.8s ease-out;
+}

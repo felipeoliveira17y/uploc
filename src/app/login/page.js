@@ -68,7 +68,7 @@ export default function LoginPage() {
             href="/register" 
             className="text-[10px] uppercase tracking-[0.2em] text-gray-500 hover:text-uploc-gold transition-colors"
           >
-            Não tem uma conta? Registre-seREADME <span className="text-uploc-gold font-bold ml-1">→</span>
+            Não tem uma conta? Registre-se <span className="text-uploc-gold font-bold ml-1">⮕</span>
           </Link>
         </div>
       </div>

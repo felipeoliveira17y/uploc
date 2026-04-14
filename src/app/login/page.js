@@ -1,8 +1,46 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
-// Se você já criou a action de login, importe-a aqui:
-// import { login } from './actions'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/utils/supabase/client' 
 
 export default function LoginPage() {
+  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState(null)
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function handleLogin(e) {
+    e.preventDefault()
+    setLoading(true)
+    setErrorMsg(null)
+
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get('email')
+    const password = formData.get('password')
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      setErrorMsg('Credenciais inválidas.')
+      setLoading(false)
+    } else {
+      const { data: perfil } = await supabase
+        .from('perfis')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+
+      if (perfil?.role === 'admin') router.push('/dashboard/admin')
+      else if (perfil?.role === 'funcionario') router.push('/dashboard/funcionario')
+      else router.push('/dashboard/cliente')
+    }
+  }
+
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-uploc-bg overflow-hidden font-sans">
 
@@ -24,7 +62,10 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form className="space-y-7">
+        {/* Mensagem de erro caso ocorra */}
+        {errorMsg && <p className="text-red-500 text-[10px] mb-4 text-center font-bold uppercase tracking-widest">{errorMsg}</p>}
+
+        <form onSubmit={handleLogin} className="space-y-7">
           {/* Campo de E-mail */}
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-uploc-gold ml-4">
@@ -56,9 +97,10 @@ export default function LoginPage() {
           {/* Botão de Entrar */}
           <button
             type="submit"
-            className="mt-6 w-full rounded-full bg-uploc-gold py-5 text-[11px] font-black uppercase tracking-[0.3em] text-uploc-bg transition-all hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(197,160,89,0.2)] active:scale-[0.98]"
+            disabled={loading}
+            className="mt-6 w-full rounded-full bg-uploc-gold py-5 text-[11px] font-black uppercase tracking-[0.3em] text-uploc-bg transition-all hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(197,160,89,0.2)] active:scale-[0.98] disabled:opacity-50"
           >
-            Entrar
+            {loading ? 'Carregando...' : 'Entrar'}
           </button>
         </form>
 
@@ -74,7 +116,6 @@ export default function LoginPage() {
 
         {/* Social Login Buttons */}
         <div className="flex justify-center gap-4">
-          {/* Social Login Buttons */}
           <div className="flex justify-center gap-4">
             {/* Google */}
             <button type="button" className="group flex h-12 w-12 items-center justify-center rounded-full bg-uploc-input border border-white/5 transition-all hover:border-uploc-gold/50 hover:scale-110">

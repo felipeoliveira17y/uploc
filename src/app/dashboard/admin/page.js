@@ -1,34 +1,32 @@
-'use client'; // Necessário para interatividade (filtros, estados, cliques)
+'use client';
 import { useState, useEffect } from 'react';
-import AdminSidebar from '@/components/AdminSidebar';
-import { createClient } from '@supabase/supabase-js';
-
-// Inicialização do Supabase (O ideal é estar num arquivo separado em /lib/supabase.js)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+// 1. Tente este import (ajuste os ../ se necessário)
+import AdminSidebar from '@/app/components/AdminSidebar'; 
+// 2. Use o cliente padrão para evitar erros de Build
+import { createClient } from '@/utils/supabase/client'; 
 
 export default function AdminDashboard() {
   const [abaAtiva, setAbaAtiva] = useState('equipamentos');
   const [dados, setDados] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Inicialize o cliente aqui
+  const supabase = createClient();
 
-  // Função para buscar dados do Supabase dependendo da aba
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
+      // 'professores' não é uma tabela, é um filtro da tabela 'perfis'
       const tabela = abaAtiva === 'professores' ? 'perfis' : abaAtiva;
       
       let query = supabase.from(tabela).select('*');
       
-      // Se for professores, filtramos apenas pela role 'professor'
       if (abaAtiva === 'professores') {
         query = query.eq('role', 'professor');
       }
 
       const { data, error } = await query;
-      if (!error) setDados(data);
+      if (!error) setDados(data || []);
       setLoading(false);
     }
     fetchData();

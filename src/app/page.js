@@ -30,7 +30,7 @@ export default function LandingPage() {
         {/* Botões de Ação */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
           <Link 
-            href="/inicial"
+            href="/home"
             className="w-full sm:w-64 rounded-full bg-uploc-gold py-5 text-[11px] font-black uppercase tracking-[0.3em] text-uploc-bg transition-all hover:scale-[1.05] hover:shadow-[0_0_30px_rgba(197,160,89,0.3)] text-center"
           >
             Começar Agora

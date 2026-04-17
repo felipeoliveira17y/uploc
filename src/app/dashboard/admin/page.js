@@ -15,7 +15,6 @@ export default function AdminDashboard() {
 
   // Estados dos Formulários
   const [novoProf, setNovoProf] = useState({ nome: '', email: '', senha: '' });
-  // novoEquip agora inclui 'imagem' e categoria padrão sincronizada
   const [novoEquip, setNovoEquip] = useState({ nome: '', categoria: 'Multimídia', imagem: '' });
 
   const supabase = createClient();
@@ -95,8 +94,9 @@ export default function AdminDashboard() {
     const { error } = await supabase.from('equipamentos').insert([{ 
       nome: novoEquip.nome, 
       categoria: novoEquip.categoria,
-      imagem: novoEquip.imagem // Adicionando a URL da imagem ao banco
+      imagem: novoEquip.imagem 
     }]);
+  
     if (!error) { 
       setShowModalEquip(false); 
       setNovoEquip({ nome: '', categoria: 'Multimídia', imagem: '' }); 
@@ -105,6 +105,17 @@ export default function AdminDashboard() {
       alert("Erro ao salvar: " + error.message);
     }
   }
+  
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNovoEquip({ ...novoEquip, imagem: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   async function handleExcluir(id) {
     if (!confirm("Deseja realmente excluir?")) return;
@@ -115,7 +126,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex min-h-screen bg-uploc-black">
-      
       <aside className="w-64 bg-uploc-gray border-r border-white/5 p-6 flex flex-col h-screen sticky top-0 shadow-2xl">
         <div className="mb-10 text-center">
           <h2 className="text-uploc-gold text-2xl font-black tracking-tighter italic">UPLOC</h2>
@@ -209,15 +219,24 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* MODAL EQUIPAMENTO ATUALIZADO */}
+      {/* MODAL EQUIPAMENTO */}
       {showModalEquip && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-uploc-gray border border-white/10 p-10 rounded-[40px] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-300">
             <h2 className="text-2xl font-black mb-8 text-center italic text-white uppercase tracking-tighter">Novo <span className="text-uploc-gold">Equipamento</span></h2>
             <form onSubmit={handleAddEquipamento} className="space-y-5">
-              <input required placeholder="Nome do Equipamento (Ex: Projetor)" className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-white outline-none focus:border-uploc-gold/50 transition-all" value={novoEquip.nome} onChange={(e) => setNovoEquip({...novoEquip, nome: e.target.value})} />
+              <input required placeholder="Nome do Equipamento" className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-white outline-none focus:border-uploc-gold/50 transition-all" value={novoEquip.nome} onChange={(e) => setNovoEquip({...novoEquip, nome: e.target.value})} />
               
-              <input placeholder="URL da Imagem (Ex: https://...)" className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-4 text-white outline-none focus:border-uploc-gold/50 transition-all" value={novoEquip.imagem} onChange={(e) => setNovoEquip({...novoEquip, imagem: e.target.value})} />
+              <div className="flex flex-col gap-2">
+                <label className="text-zinc-500 text-[10px] uppercase font-bold ml-2">Foto do Equipamento</label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  required
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl px-6 py-3 text-sm text-zinc-400 outline-none focus:border-uploc-gold/50 file:bg-uploc-gold file:text-black file:border-0 file:rounded-full file:px-4 file:py-1 file:text-[10px] file:font-black file:uppercase file:cursor-pointer" 
+                  onChange={handleFileChange} 
+                />
+              </div>
 
               <div className="relative">
                 <select 
@@ -242,7 +261,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

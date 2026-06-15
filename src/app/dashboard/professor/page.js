@@ -2,12 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 const CATEGORIAS = ['Todos', 'Laboratório', 'Multimídia', 'Informática', 'Fotografia', 'Áudio', 'Vídeo'];
 const HORARIOS = ['07:30 - 08:20', '08:20 - 09:10', '09:20 - 10:10', '10:10 - 11:00', '13:30 - 14:20', '14:20 - 15:10'];
 
 export default function TelaLocacaoEscolar() {
   const supabase = createClient();
+  const router = useRouter();
 
   const [equipamentos, setEquipamentos] = useState([]);
   const [abaAtiva, setAbaAtiva] = useState('Todos');
@@ -44,7 +46,7 @@ export default function TelaLocacaoEscolar() {
     }
   };
 
-  // 2. FUNÇÃO PARA CONFIRMAR RESERVA (Sem precisar de Auth)
+  // 2. FUNÇÃO PARA CONFIRMAR RESERVA
   const confirmarReserva = async () => {
     if (!dataReserva || horariosSelecionados.length === 0) {
       alert("Selecione a data e pelo menos um horário.");
@@ -56,15 +58,14 @@ export default function TelaLocacaoEscolar() {
       return;
     }
 
-    // Dados fixos do professor conforme seu SQL (Thiago Soares)
-    const ID_PROFESSOR_SISTEMA = '1ad1108d-da3b-41cb-898e-484c73b68fcf';
+    const ID_PROFESSOR_SISTEMA = '7ca0a569-5c21-416c-af14-69b91b38c347';
     const EMAIL_PROFESSOR_SISTEMA = 'thiagosoares@gmail.com';
 
     const { error } = await supabase
       .from('reservas')
       .insert([{
         equipamento_id: itemSelecionado.id, 
-        professor_id: ID_PROFESSOR_SISTEMA, // UUID válido no seu banco
+        professor_id: ID_PROFESSOR_SISTEMA,
         professor_email: EMAIL_PROFESSOR_SISTEMA,
         horario_inicio: horariosSelecionados.join(', '), 
         data_reserva: dataReserva,
@@ -105,11 +106,21 @@ export default function TelaLocacaoEscolar() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-10">
+        {/* TITULO E BOTAO VOLTAR */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12">
-          <h1 className="text-3xl font-black uppercase tracking-[0.2em] mb-2">
-            Reserva de <span className="text-[#d1a661]">Materiais</span>
-          </h1>
-          <div className="h-1 w-20 bg-[#d1a661]"></div>
+          <div className="flex items-center gap-4 mb-2">
+            <button 
+              onClick={() => router.push('/home')} 
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-[#222222] border border-white/5 text-zinc-400 hover:text-[#d1a661] hover:border-[#d1a661]/40 transition-all text-lg"
+              title="Voltar para a Home"
+            >
+              ←
+            </button>
+            <h1 className="text-3xl font-black uppercase tracking-[0.2em]">
+              Reserva de <span className="text-[#d1a661]">Materiais</span>
+            </h1>
+          </div>
+          <div className="h-1 w-20 bg-[#d1a661] ml-14"></div>
         </motion.div>
 
         {/* ABAS DE CATEGORIAS */}
@@ -151,10 +162,21 @@ export default function TelaLocacaoEscolar() {
                   </div>
                 </div>
                 <div className="p-6">
-                  <h3 className="font-bold text-lg text-white mb-4 h-12 line-clamp-2 group-hover:text-[#d1a661] transition-colors">{item.nome}</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">{item.status || 'Disponível'}</span>
-                    <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                  <h3 className="font-bold text-lg text-white mb-1 h-12 line-clamp-2 group-hover:text-[#d1a661] transition-colors">{item.nome}</h3>
+                  
+                  {/* NOVOS CAMPOS EXIBIDOS DE FORMA COMPACTA NO CARD */}
+                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider mb-4 truncate">
+                    {item.marca && item.modelo ? `${item.marca} • ${item.modelo}` : 'Especificação não informada'}
+                  </p>
+
+                  <div className="flex items-center justify-between border-t border-white/5 pt-3">
+                    <span className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">
+                      {item.patrimonio ? `PAT: ${item.patrimonio}` : 'Disponível'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-zinc-400 font-bold uppercase">{item.estado_conservacao || 'Bom'}</span>
+                      <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -163,7 +185,7 @@ export default function TelaLocacaoEscolar() {
         )}
       </main>
 
-      {/* MODAL DE RESERVA */}
+      {/* MODAL DE RESERVA ATUALIZADO */}
       <AnimatePresence>
         {itemSelecionado && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
@@ -171,24 +193,41 @@ export default function TelaLocacaoEscolar() {
               initial={{ scale: 0.9, y: 20, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.9, y: 20, opacity: 0 }}
-              className="bg-[#222222] w-full max-w-lg rounded-[40px] border border-white/10 shadow-3xl overflow-hidden"
+              className="bg-[#222222] w-full max-w-lg rounded-[40px] border border-white/10 shadow-3xl overflow-hidden max-h-[95vh] overflow-y-auto"
             >
-              <div className="h-32 bg-zinc-900 relative">
-                {itemSelecionado.imagem && <img src={itemSelecionado.imagem} className="w-full h-full object-cover opacity-20" alt="" />}
-                <button onClick={fecharModal} className="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center border border-white/10 hover:bg-[#d1a661] hover:text-black transition-all">✕</button>
+              <div className="h-40 bg-zinc-900 relative">
+                {itemSelecionado.imagem && <img src={itemSelecionado.imagem} className="w-full h-full object-cover opacity-40" alt="" />}
+                <button onClick={fecharModal} className="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center border border-white/10 hover:bg-[#d1a661] hover:text-black transition-all z-20">✕</button>
+                <div className="absolute bottom-4 left-10 z-10">
+                  <span className="px-3 py-1 bg-[#d1a661] rounded-full text-[9px] font-black uppercase text-black">{itemSelecionado.categoria}</span>
+                </div>
               </div>
 
-              <div className="px-10 pb-10 -mt-6 relative z-10">
-                <h2 className="text-[#d1a661] text-2xl font-black uppercase italic">{itemSelecionado.nome}</h2>
+              <div className="px-10 pb-10 pt-6 relative z-10">
+                <h2 className="text-[#d1a661] text-2xl font-black uppercase italic leading-tight">{itemSelecionado.nome}</h2>
+                
+                {/* BLOCo ADICIONAL: ESPECIFICAÇÕES TÉCNICAS DO PRODUTO */}
+                <div className="mt-4 p-4 bg-zinc-900/60 rounded-2xl border border-white/5 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                  <div><span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Marca / Modelo:</span> <span className="text-zinc-200 font-medium">{itemSelecionado.marca || '—'} {itemSelecionado.modelo || '—'}</span></div>
+                  <div><span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Nº de Patrimônio:</span> <span className="text-zinc-200 font-mono font-bold">{itemSelecionado.patrimonio || '—'}</span></div>
+                  <div><span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Nº de Série:</span> <span className="text-zinc-400 font-mono">{itemSelecionado.numero_serie || '—'}</span></div>
+                  <div><span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Estado do Objeto:</span> <span className="text-green-400 font-bold uppercase text-[10px]">{itemSelecionado.estado_conservacao || 'Bom'}</span></div>
+                  {itemSelecionado.observacoes && (
+                    <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
+                      <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Observações de Uso:</span>
+                      <p className="text-zinc-400 italic text-[10px] leading-relaxed">{itemSelecionado.observacoes}</p>
+                    </div>
+                  )}
+                </div>
 
-                <div className="mt-8 space-y-6">
+                <div className="mt-6 space-y-5">
                   <div>
-                    <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-3 block">Data da Reserva</label>
-                    <input type="date" className="w-full bg-zinc-900/50 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-[#d1a661]" value={dataReserva} onChange={(e) => setDataReserva(e.target.value)} />
+                    <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-2 block">Data da Reserva</label>
+                    <input type="date" className="w-full bg-zinc-900/50 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-[#d1a661] text-sm" value={dataReserva} onChange={(e) => setDataReserva(e.target.value)} />
                   </div>
 
                   <div>
-                    <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest block mb-3">Selecione os Horários ({horariosSelecionados.length})</label>
+                    <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest block mb-2">Selecione os Horários ({horariosSelecionados.length})</label>
                     <div className="grid grid-cols-2 gap-2">
                       {HORARIOS.map((h) => (
                         <button
@@ -208,10 +247,10 @@ export default function TelaLocacaoEscolar() {
 
                   {horariosSelecionados.length > 3 && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}>
-                      <label className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-3 block">Justificativa de Longa Duração</label>
+                      <label className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-2 block">Justificativa de Longa Duração</label>
                       <textarea
                         placeholder="Descreva o motivo do uso prolongado..."
-                        className="w-full bg-zinc-900/80 border border-red-400/30 rounded-2xl p-4 text-sm text-white outline-none focus:border-red-400 min-h-[80px] resize-none"
+                        className="w-full bg-zinc-900/80 border border-red-400/30 rounded-2xl p-4 text-sm text-white outline-none focus:border-red-400 min-h-[70px] resize-none"
                         value={motivo}
                         onChange={(e) => setMotivo(e.target.value)}
                       />
@@ -220,7 +259,7 @@ export default function TelaLocacaoEscolar() {
 
                   <button
                     onClick={confirmarReserva}
-                    className="w-full py-5 bg-[#d1a661] text-black rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-[1.02] transition-transform"
+                    className="w-full py-5 bg-[#d1a661] text-black rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-[1.02] transition-transform pt-4"
                   >
                     Finalizar Agendamento
                   </button>
@@ -232,4 +271,4 @@ export default function TelaLocacaoEscolar() {
       </AnimatePresence>
     </div>
   );
-}
+} 

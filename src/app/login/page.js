@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/utils/supabase/client' 
+import { createClient } from '@/utils/supabase/client'
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState(null)
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -19,13 +20,11 @@ export default function LoginPage() {
     const email = formData.get('email')
     const password = formData.get('password')
 
-    // LÓGICA DE APRESENTAÇÃO: Busca direta na tabela perfis
-    // Comparamos o e-mail e a senha que você digitou com o que está no banco
     const { data: usuario, error } = await supabase
       .from('perfis')
       .select('role, nome_completo')
       .eq('email', email)
-      .eq('senha', password) // Busca a senha em texto puro na sua tabela
+      .eq('senha', password)
       .single()
 
     if (error || !usuario) {
@@ -34,7 +33,6 @@ export default function LoginPage() {
       return
     }
 
-    // REDIRECIONAMENTO POR CARGO (ROLE)
     if (usuario.role === 'admin') {
       router.push('/dashboard/admin')
     } else if (usuario.role === 'professor') {
@@ -42,8 +40,6 @@ export default function LoginPage() {
     } else {
       router.push('/home')
     }
-
-    router.refresh()
   }
 
   return (
@@ -53,11 +49,23 @@ export default function LoginPage() {
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-uploc-gold/5 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="z-10 w-full max-w-[420px] animate-fade-up rounded-[45px] bg-uploc-card p-12 border border-white/5 shadow-2xl mx-4 text-white">
+
+        {/* Botão Voltar */}
+        <button
+          type="button"
+          onClick={() => router.push('/home')}
+          className="mb-8 rounded-full border border-white/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 transition-all hover:border-uploc-gold/30 hover:text-uploc-gold"
+        >
+          ← Voltar para Home
+        </button>
+
         <div className="mb-12 text-center uppercase tracking-[0.4em]">
           <h1 className="text-2xl font-light text-white">
             LOGIN <span className="font-bold text-uploc-gold">UPLOC</span>
           </h1>
+
           <div className="h-[1px] w-12 bg-uploc-gold mx-auto mt-2 opacity-30"></div>
+
           <p className="mt-4 text-[9px] text-zinc-500 font-bold tracking-[0.2em]">
             Equipamentos Multimídia
           </p>
@@ -74,6 +82,7 @@ export default function LoginPage() {
             <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-uploc-gold ml-4">
               E-mail
             </label>
+
             <input
               name="email"
               type="email"
@@ -87,6 +96,7 @@ export default function LoginPage() {
             <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-uploc-gold ml-4">
               Senha
             </label>
+
             <input
               name="password"
               type="password"

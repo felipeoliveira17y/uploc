@@ -8,6 +8,14 @@ export default function AdminDashboard() {
   const [busca, setBusca] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // --- CONTROLE DE EXPANSÃO DOS FILTROS ---
+  const [filtrosExpandidos, setFiltrosExpandidos] = useState(false);
+
+  // --- ESTADOS PARA FILTROS AVANÇADOS ---
+  const [filtroProf, setFiltroProf] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [listaProfessores, setListaProfessores] = useState([]); 
+
   const [showModalProf, setShowModalProf] = useState(false);
   const [showModalEquip, setShowModalEquip] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
@@ -15,23 +23,30 @@ export default function AdminDashboard() {
   const [novoProf, setNovoProf] = useState({ nome: '', email: '', senha: '', imagem: '' });
   
   const [novoEquip, setNovoEquip] = useState({ 
-    nome: '', 
-    categoria: 'Multimídia', 
-    imagem: '',
-    patrimonio: '',           
-    marca: '',               
-    modelo: '',              
-    numero_serie: '',        
-    estado_conservacao: 'Bom', 
-    observacoes: ''          
-  });
+  nome: '', 
+  categoria: 'Multimídia', 
+  marca: '',
+  modelo: '',
+  estado_conservacao: 'Bom',
+  imagem: '', // Garante que começa como string vazia, não undefined
+  status: 'disponivel'
+});
   const [uploading, setUploading] = useState(false);
 
   const supabase = createClient();
 
+  async function carregarProfessoresParaFiltro() {
+    try {
+      const { data } = await supabase.from('perfis').select('id, nome_completo, email').eq('role', 'professor').order('nome_completo', { ascending: true });
+      if (data) setListaProfessores(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   async function fetchData() {
     setLoading(true);
-    setDados([]); // Limpa os dados da aba anterior imediatamente
+    setDados([]); 
     try {
       const tabelas = { equipamentos: 'equipamentos', professores: 'perfis', reservas: 'reservas' };
       const tabelaAlvo = tabelas[abaAtiva] || abaAtiva;
@@ -42,13 +57,12 @@ export default function AdminDashboard() {
         query = query.eq('role', 'professor');
       }
       
-      // ORDENAÇÃO ESPECÍFICA PARA CADA TABELA:
       if (abaAtiva === 'equipamentos') {
-        query = query.order('nome', { ascending: true }); // Ordena equipamentos por nome
+        query = query.order('nome', { ascending: true });
       } else if (abaAtiva === 'professores') {
-        query = query.order('nome_completo', { ascending: true }); // Ordena professores por nome completo
+        query = query.order('nome_completo', { ascending: true });
       } else if (abaAtiva === 'reservas') {
-        query = query.order('created_at', { ascending: false }); // Reservas geralmente usam criacao (ou mude para 'id')
+        query = query.order('created_at', { ascending: false });
       }
 
       const { data, error } = await query;
@@ -65,11 +79,34 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
+    carregarProfessoresParaFiltro();
+  }, []);
+
+  useEffect(() => {
     fetchData();
     setBusca('');
+    setFiltroProf('');
+    setFiltroStatus('');
   }, [abaAtiva]);
 
-  // --- LÓGICA DE DEVOLUÇÃO ---
+  async function handleAlternarManutencao(equipamento) {
+    const novoStatus = equipamento.status === 'manutencao' ? 'disponivel' : 'manutencao';
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('equipamentos')
+        .update({ status: novoStatus })
+        .eq('id', equipamento.id);
+
+      if (error) throw error;
+      fetchData();
+    } catch (error) {
+      alert("Erro ao alterar manutenção: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleDevolucao(reserva) {
     if (!confirm("Confirmar a devolução deste equipamento?")) return;
 
@@ -94,7 +131,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // --- LÓGICA DE UPLOAD ---
   async function handleFileChange(e, tipo) {
     const file = e.target.files[0];
     if (!file) return;
@@ -135,7 +171,8 @@ export default function AdminDashboard() {
         modelo: '', 
         numero_serie: '', 
         estado_conservacao: 'Bom', 
-        observacoes: '' 
+        observacoes: '',
+        status: 'disponivel'
       });
       fetchData();
     }
@@ -171,15 +208,37 @@ export default function AdminDashboard() {
     }
   }
 
-  // Tratamento preventivo para strings nulas no filtro de busca
+  // --- LÓGICA DE RELATÓRIO INDIVIDUALIZADO ---
+  function handleGerarRelatorioProfessor(professor) {
+    alert(`Gerando arquivo consolidado de auditoria UPLOC (PDF/CSV) para o docente:\n\n` +
+          `Nome: ${professor.nome_completo}\n` +
+          `E-mail: ${professor.email}\n\n` +
+          `Apenas as reservas deste professor serão consolidadas.`);
+  }
+
   const dadosFiltrados = dados.filter(item => {
     const nome = item.nome || "";
     const nomeCompleto = item.nome_completo || "";
-    const emailProf = item.professor_email || "";
+    const emailProf = item.professor_email || item.email || "";
     const patrimonio = item.patrimonio || "";
-
     const termo = `${nome} ${nomeCompleto} ${emailProf} ${patrimonio}`.toLowerCase();
-    return termo.includes(busca.toLowerCase());
+    const passaBusca = termo.includes(busca.toLowerCase());
+
+    let passaProf = true;
+    if (filtroProf) {
+      if (abaAtiva === 'reservas') {
+        passaProf = item.professor_email === filtroProf;
+      } else if (abaAtiva === 'professores') {
+        passaProf = item.email === filtroProf;
+      }
+    }
+
+    let passaStatus = true;
+    if (filtroStatus && abaAtiva === 'reservas') {
+      passaStatus = item.status_reserva === filtroStatus;
+    }
+
+    return passaBusca && passaProf && passaStatus;
   });
 
   return (
@@ -187,7 +246,7 @@ export default function AdminDashboard() {
       {/* SIDEBAR */}
       <aside className="w-64 bg-[#111] border-r border-white/5 p-6 flex flex-col h-screen sticky top-0">
         <div className="mb-10 text-center">
-          <h2 className="text-[#d1a661] text-2xl font-black italic">UPLOC</h2>
+          <h2 className="text-[#d1a661] text-2xl font-black italic tracking-[2px]">UPLOC</h2>
           <p className="text-zinc-500 text-[10px] uppercase mt-1 font-bold tracking-[3px]">Admin Panel</p>
         </div>
         <nav className="flex-1 space-y-2">
@@ -201,19 +260,89 @@ export default function AdminDashboard() {
 
       {/* CONTEÚDO PRINCIPAL */}
       <main className="flex-1 p-10 overflow-y-auto">
-        <div className="flex justify-between items-end mb-10 gap-6">
-          <div className="flex-1">
-            <h1 className="text-4xl font-bold capitalize mb-4">{abaAtiva}</h1>
-            <input type="text" placeholder={`Pesquisar em ${abaAtiva}...`} value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full max-w-md bg-[#111] border border-white/5 rounded-xl px-5 py-3 text-sm outline-none focus:border-[#d1a661]/50" />
+        
+        {/* TOP BAR / HEADER LIMPO */}
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-10 gap-6 pb-6 border-b border-white/[0.03]">
+          <div>
+            <h1 className="text-4xl font-bold capitalize mb-1 tracking-wide">{abaAtiva}</h1>
+            <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Supervisão e Auditoria</p>
           </div>
-          {abaAtiva !== 'reservas' && (
-            <button onClick={() => { setEditandoId(null); abaAtiva === 'professores' ? setShowModalProf(true) : setShowModalEquip(true) }} className="bg-[#d1a661] text-black px-8 py-4 rounded-xl font-black text-xs uppercase shadow-lg hover:scale-105 transition-transform">
-              + Novo {abaAtiva === 'professores' ? 'Professor' : 'Equipamento'}
+          
+          {/* BLOCO CONTROLADOR UNIFICADO */}
+          <div className="flex items-center gap-3">
+            
+            {/* GATILHO PARA EXPANDIR FILTROS AVANÇADOS */}
+            <div 
+              onClick={() => setFiltrosExpandidos(!filtrosExpandidos)}
+              className={`px-5 py-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 select-none text-xs ${filtrosExpandidos ? 'border-[#d1a661] bg-[#d1a661]/5 text-[#d1a661]' : 'border-white/5 bg-[#111]/60 text-zinc-400 hover:border-white/20'}`}
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-current" />
+              <span className="font-medium uppercase tracking-widest">Filtros</span>
+            </div>
+
+            {/* BOTÃO CRIAR REGISTRO */}
+            {abaAtiva !== 'reservas' && (
+              <button onClick={() => { setEditandoId(null); abaAtiva === 'professores' ? setShowModalProf(true) : setShowModalEquip(true) }} className="bg-[#d1a661] text-black px-6 py-3 rounded-xl font-bold text-xs uppercase hover:bg-[#c49852] transition-colors tracking-wider whitespace-nowrap">
+                + Novo {abaAtiva === 'professores' ? 'Professor' : 'Equipamento'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* --- SEÇÃO DINÂMICA DE FILTROS RETRÁTEIS --- */}
+        <div className={`rounded-2xl bg-[#111]/80 border border-white/5 shadow-xl p-6 flex flex-wrap items-center gap-4 transition-all duration-300 mb-8 ${filtrosExpandidos ? 'opacity-100 max-h-[500px]' : 'opacity-0 max-h-0 !p-0 !border-none overflow-hidden !mb-0'}`}>
+          
+          {/* BARRA DE PESQUISA */}
+          <div className="flex-1 min-w-[250px]">
+            <label className="text-[9px] font-bold uppercase tracking-wider text-[#d1a661] mb-1.5 block ml-1">Pesquisa Direta</label>
+            <input type="text" placeholder={`Procurar termo em ${abaAtiva}...`} value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#d1a661]/50 placeholder:text-zinc-600 h-[40px]" />
+          </div>
+
+          {/* Seletor de Professores */}
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-[9px] font-bold uppercase tracking-wider text-[#d1a661] mb-1.5 block ml-1">Professor</label>
+            <select 
+              value={filtroProf} 
+              onChange={(e) => setFiltroProf(e.target.value)}
+              className="w-full rounded-xl bg-zinc-900 border border-white/5 px-4 py-2.5 text-xs text-zinc-400 focus:outline-none focus:border-[#d1a661]/50 transition-all cursor-pointer h-[40px]"
+            >
+              <option value="">Todos os Professores</option>
+              {listaProfessores.map(prof => (
+                <option key={prof.id} value={prof.email}>{prof.nome_completo}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Seletor de Status - EXIBIDO CONDICIONALMENTE APENAS NA ABA RESERVAS */}
+          {abaAtiva === 'reservas' && (
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-[9px] font-bold uppercase tracking-wider text-[#d1a661] mb-1.5 block ml-1">Status Reserva</label>
+              <select 
+                value={filtroStatus} 
+                onChange={(e) => setFiltroStatus(e.target.value)}
+                className="w-full rounded-xl bg-zinc-900 border border-white/5 px-4 py-2.5 text-xs text-zinc-400 focus:outline-none focus:border-[#d1a661]/50 transition-all cursor-pointer h-[40px]"
+              >
+                <option value="">Todos os Status</option>
+                <option value="solicitada">Solicitada / Pendente</option>
+                <option value="ativa">Ativa (Em uso)</option>
+                <option value="finalizada">Finalizada / Devolvida</option>
+              </select>
+            </div>
+          )}
+
+          {/* Botão de Limpar */}
+          {(filtroProf || filtroStatus || busca) && (
+            <button 
+              onClick={() => { setFiltroProf(''); setFiltroStatus(''); setBusca(''); }}
+              className="mt-5 text-zinc-500 hover:text-[#d1a661] text-[10px] uppercase font-bold tracking-widest transition-colors px-2"
+            >
+              Limpar
             </button>
           )}
         </div>
 
-        <div className="bg-[#111] rounded-[30px] border border-white/5 overflow-hidden shadow-2xl">
+        {/* TABELA DE REGISTROS */}
+        <div className="bg-[#111] rounded-[24px] border border-white/5 overflow-hidden shadow-2xl">
           {loading ? (
             <div className="p-20 text-center text-[#d1a661] font-bold uppercase text-xs tracking-widest animate-pulse">Buscando informações...</div>
           ) : (
@@ -232,8 +361,13 @@ export default function AdminDashboard() {
                     <td className="p-6">
                       <div className="flex items-center gap-5">
                         {abaAtiva !== 'reservas' && (
-                          <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/5 overflow-hidden flex-shrink-0">
+                          <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/5 overflow-hidden flex-shrink-0 relative">
                             <img src={item.imagem || item.avatar_url || 'https://via.placeholder.com/150'} className="w-full h-full object-cover" alt="" />
+                            {item.status === 'manutencao' && (
+                              <div className="absolute inset-0 bg-orange-600/80 backdrop-blur-[1px] flex items-center justify-center">
+                                <span className="text-[7px] font-black text-white uppercase tracking-tighter">MNT</span>
+                              </div>
+                            )}
                           </div>
                         )}
                         <div>
@@ -242,16 +376,16 @@ export default function AdminDashboard() {
                           </p>
                           <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider mt-1">
                             {abaAtiva === 'reservas' 
-                              ? `${item.professor_email} • ${item.data_reserva} • ${item.horario_inicio}` 
+                              ? `${item.professor_email} • ${item.data_reserva} • ${item.horario_inicio} (${item.status_reserva || 'solicitada'})` 
                               : (item.patrimonio 
-                                  ? `Patrimônio: ${item.patrimonio} • ${item.marca || ''} (${item.estado_conservacao || 'Bom'})` 
+                                  ? `Patrimônio: ${item.patrimonio} • ${item.marca || ''} (${item.estado_conservacao || 'Bom'}) • Status: ${item.status || 'disponivel'}` 
                                   : `Categoria: ${item.categoria || 'Não informada'} ${item.email || ''}`)}
                           </p>
                         </div>
                       </div>
                     </td>
                     <td className="p-6 text-center">
-                      <div className="flex justify-center gap-2">
+                      <div className="flex justify-center items-center gap-2">
                         {abaAtiva === 'reservas' ? (
                           <>
                             {item.status_reserva !== 'finalizada' ? (
@@ -265,6 +399,26 @@ export default function AdminDashboard() {
                           </>
                         ) : (
                           <>
+                            {/* BOTÃO DE MANUTENÇÃO */}
+                            {abaAtiva === 'equipamentos' && (
+                              <button 
+                                onClick={() => handleAlternarManutencao(item)}
+                                className={`px-5 py-2 rounded-full text-[10px] font-black uppercase transition-all ${item.status === 'manutencao' ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'}`}
+                              >
+                                {item.status === 'manutencao' ? 'Em Manutenção' : 'Manutenção'}
+                              </button>
+                            )}
+
+                            {/* BOTÃO DE RELATÓRIO INDIVIDUAL */}
+                            {abaAtiva === 'professores' && (
+                              <button 
+                                onClick={() => handleGerarRelatorioProfessor(item)}
+                                className="bg-[#d1a661]/10 text-[#d1a661] border border-[#d1a661]/20 hover:bg-[#d1a661] hover:text-black px-5 py-2 rounded-full text-[10px] font-black uppercase transition-all"
+                              >
+                                Relatório
+                              </button>
+                            )}
+                            
                             <button onClick={() => {
                               setEditandoId(item.id);
                               if(abaAtiva === 'equipamentos') {
@@ -277,7 +431,8 @@ export default function AdminDashboard() {
                                   modelo: item.modelo || '',
                                   numero_serie: item.numero_serie || '',
                                   estado_conservacao: item.estado_conservacao || 'Bom',
-                                  observacoes: item.observacoes || ''
+                                  observacoes: item.observacoes || '',
+                                  status: item.status || 'disponivel'
                                 });
                                 setShowModalEquip(true);
                               } else {
@@ -323,65 +478,62 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-black mb-6 text-white uppercase text-center">{editandoId ? 'Editar' : 'Novo'} <span className="text-[#d1a661]">Equipamento</span></h2>
             
             <form onSubmit={handleAddEquipamento} className="space-y-4">
-              <div>
-                <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Nome</label>
-                <input required placeholder="Ex: Câmera Mirrorless" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.nome} onChange={(e) => setNovoEquip({...novoEquip, nome: e.target.value})} />
-              </div>
+  {/* LINHA 1: NOME E CATEGORIA */}
+  <div className="grid grid-cols-2 gap-4">
+    <div>
+      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Nome</label>
+      <input required placeholder="Ex: Câmera Mirrorless" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.nome} onChange={(e) => setNovoEquip({...novoEquip, nome: e.target.value})} />
+    </div>
+    <div>
+      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Categoria</label>
+      <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none text-sm h-[46px] cursor-pointer" value={novoEquip.categoria} onChange={(e) => setNovoEquip({...novoEquip, categoria: e.target.value})}>
+        {['Laboratório', 'Multimídia', 'Informática', 'Fotografia', 'Áudio', 'Vídeo'].map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+    </div>
+  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Categoria</label>
-                  <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none text-sm h-[46px]" value={novoEquip.categoria} onChange={(e) => setNovoEquip({...novoEquip, categoria: e.target.value})}>
-                    {['Laboratório', 'Multimídia', 'Informática', 'Fotografia', 'Áudio', 'Vídeo'].map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Nº de Patrimônio</label>
-                  <input required placeholder="Ex: PAT-2026-88" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 toughness text-sm" value={novoEquip.patrimonio} onChange={(e) => setNovoEquip({...novoEquip, patrimonio: e.target.value})} />
-                </div>
-              </div>
+  {/* LINHA 2: MARCA E MODELO */}
+  <div className="grid grid-cols-2 gap-4">
+    <div>
+      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Marca</label>
+      <input required placeholder="Ex: Sony" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.marca} onChange={(e) => setNovoEquip({...novoEquip, marca: e.target.value})} />
+    </div>
+    <div>
+      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Modelo</label>
+      <input required placeholder="Ex: Alpha a7 III" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.modelo} onChange={(e) => setNovoEquip({...novoEquip, modelo: e.target.value})} />
+    </div>
+  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Marca</label>
-                  <input required placeholder="Ex: Sony" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.marca} onChange={(e) => setNovoEquip({...novoEquip, marca: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Modelo</label>
-                  <input required placeholder="Ex: Alpha a7 III" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.modelo} onChange={(e) => setNovoEquip({...novoEquip, modelo: e.target.value})} />
-                </div>
-              </div>
+  {/* LINHA 3: ESTADO DE CONSERVAÇÃO E SELEÇÃO DE ARQUIVO LOCAL */}
+  <div className="grid grid-cols-2 gap-4 items-end">
+    <div>
+      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Estado de Conservação</label>
+      <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none text-sm h-[46px] cursor-pointer" value={novoEquip.estado_conservacao} onChange={(e) => setNovoEquip({...novoEquip, estado_conservacao: e.target.value})}>
+        {['Excelente', 'Bom', 'Regular', 'Ruim'].map(status => <option key={status} value={status}>{status}</option>)}
+      </select>
+    </div>
+    <div>
+      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Upload de Foto (Local)</label>
+      <div className="h-[46px] flex items-center bg-zinc-900 border border-white/5 rounded-xl px-3">
+        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'equipamentos')} className="w-full text-xs text-zinc-500 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-zinc-800 file:text-white hover:file:bg-zinc-700 cursor-pointer" />
+      </div>
+    </div>
+  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Número de Série</label>
-                  <input required placeholder="Ex: SN-8839210" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.numero_serie} onChange={(e) => setNovoEquip({...novoEquip, numero_serie: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Estado de Conservação</label>
-                  <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none text-sm h-[46px]" value={novoEquip.estado_conservacao} onChange={(e) => setNovoEquip({...novoEquip, estado_conservacao: e.target.value})}>
-                    {['Excelente', 'Bom', 'Regular', 'Ruim'].map(status => <option key={status} value={status}>{status}</option>)}
-                  </select>
-                </div>
-              </div>
+  {/* LINHA 4: ADICIONAR IMAGEM POR LINK (LARGURA TOTAL) */}
+  <div>
+    <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Ou link da imagem externa</label>
+    <input placeholder="Ex: https://site.com/imagem-do-equipamento.jpg" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.imagem} onChange={(e) => setNovoEquip({...novoEquip, imagem: e.target.value})} />
+  </div>
 
-              <div>
-                <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Observações Gerais</label>
-                <textarea placeholder="Ex: Riscos leves na carcaça lateral, lente sem poeira." className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm min-h-[60px] resize-none" value={novoEquip.observacoes} onChange={(e) => setNovoEquip({...novoEquip, observacoes: e.target.value})} />
-              </div>
-
-              <div>
-                <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Foto do Equipamento</label>
-                <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'equipamentos')} className="block w-full text-xs text-zinc-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-zinc-800 file:text-white hover:file:bg-zinc-700 cursor-pointer" />
-              </div>
-
-              <div className="pt-2">
-                <button type="submit" disabled={uploading} className="w-full bg-[#d1a661] text-black font-black py-4 rounded-xl uppercase text-xs tracking-widest shadow-lg hover:scale-[1.02] transition-transform">
-                  {uploading ? 'Processando Upload...' : 'Confirmar Registro'}
-                </button>
-                <button onClick={() => setShowModalEquip(false)} type="button" className="w-full text-zinc-500 text-[10px] uppercase font-bold tracking-widest pt-4">Cancelar</button>
-              </div>
-            </form>
+  {/* LINHA 5: BOTÕES DE AÇÃO */}
+  <div className="pt-2">
+    <button type="submit" disabled={uploading} className="w-full bg-[#d1a661] text-black font-black py-4 rounded-xl uppercase text-xs tracking-widest shadow-lg hover:scale-[1.02] transition-transform">
+      {uploading ? 'Processando Upload...' : 'Confirmar Registro'}
+    </button>
+    <button onClick={() => setShowModalEquip(false)} type="button" className="w-full text-zinc-500 text-[10px] uppercase font-bold tracking-widest pt-4">Cancelar</button>
+  </div>
+</form>
           </div>
         </div>
       )}

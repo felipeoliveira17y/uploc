@@ -23,14 +23,14 @@ export default function AdminDashboard() {
   const [novoProf, setNovoProf] = useState({ nome: '', email: '', senha: '', imagem: '' });
   
   const [novoEquip, setNovoEquip] = useState({ 
-  nome: '', 
-  categoria: 'Multimídia', 
-  marca: '',
-  modelo: '',
-  estado_conservacao: 'Bom',
-  imagem: '', // Garante que começa como string vazia, não undefined
-  status: 'disponivel'
-});
+    nome: '', 
+    categoria: 'Multimídia', 
+    marca: '',
+    modelo: '',
+    estado_conservacao: 'Bom',
+    imagem: '', 
+    status: 'disponivel'
+  });
   const [uploading, setUploading] = useState(false);
 
   const supabase = createClient();
@@ -153,25 +153,34 @@ export default function AdminDashboard() {
 
   async function handleAddEquipamento(e) {
     e.preventDefault();
-    const payload = { ...novoEquip };
+    
+    // Filtramos o payload para enviar ao banco APENAS as colunas válidas existentes
+    const payload = {
+      nome: novoEquip.nome,
+      categoria: novoEquip.categoria,
+      marca: novoEquip.marca,
+      modelo: novoEquip.modelo,
+      estado_conservacao: novoEquip.estado_conservacao,
+      imagem: novoEquip.imagem,
+      status: novoEquip.status
+    };
+
     const res = editandoId 
       ? await supabase.from('equipamentos').update(payload).eq('id', editandoId)
       : await supabase.from('equipamentos').insert([payload]);
 
-    if (res.error) alert(res.error.message);
-    else {
+    if (res.error) {
+      alert(res.error.message);
+    } else {
       setShowModalEquip(false);
       setEditandoId(null);
       setNovoEquip({ 
         nome: '', 
         categoria: 'Multimídia', 
-        imagem: '', 
-        patrimonio: '', 
         marca: '', 
         modelo: '', 
-        numero_serie: '', 
         estado_conservacao: 'Bom', 
-        observacoes: '',
+        imagem: '', 
         status: 'disponivel'
       });
       fetchData();
@@ -208,7 +217,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // --- LÓGICA DE RELATÓRIO INDIVIDUALIZADO ---
   function handleGerarRelatorioProfessor(professor) {
     alert(`Gerando arquivo consolidado de auditoria UPLOC (PDF/CSV) para o docente:\n\n` +
           `Nome: ${professor.nome_completo}\n` +
@@ -220,8 +228,7 @@ export default function AdminDashboard() {
     const nome = item.nome || "";
     const nomeCompleto = item.nome_completo || "";
     const emailProf = item.professor_email || item.email || "";
-    const patrimonio = item.patrimonio || "";
-    const termo = `${nome} ${nomeCompleto} ${emailProf} ${patrimonio}`.toLowerCase();
+    const termo = `${nome} ${nomeCompleto} ${emailProf}`.toLowerCase();
     const passaBusca = termo.includes(busca.toLowerCase());
 
     let passaProf = true;
@@ -268,10 +275,7 @@ export default function AdminDashboard() {
             <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Supervisão e Auditoria</p>
           </div>
           
-          {/* BLOCO CONTROLADOR UNIFICADO */}
           <div className="flex items-center gap-3">
-            
-            {/* GATILHO PARA EXPANDIR FILTROS AVANÇADOS */}
             <div 
               onClick={() => setFiltrosExpandidos(!filtrosExpandidos)}
               className={`px-5 py-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 select-none text-xs ${filtrosExpandidos ? 'border-[#d1a661] bg-[#d1a661]/5 text-[#d1a661]' : 'border-white/5 bg-[#111]/60 text-zinc-400 hover:border-white/20'}`}
@@ -280,7 +284,6 @@ export default function AdminDashboard() {
               <span className="font-medium uppercase tracking-widest">Filtros</span>
             </div>
 
-            {/* BOTÃO CRIAR REGISTRO */}
             {abaAtiva !== 'reservas' && (
               <button onClick={() => { setEditandoId(null); abaAtiva === 'professores' ? setShowModalProf(true) : setShowModalEquip(true) }} className="bg-[#d1a661] text-black px-6 py-3 rounded-xl font-bold text-xs uppercase hover:bg-[#c49852] transition-colors tracking-wider whitespace-nowrap">
                 + Novo {abaAtiva === 'professores' ? 'Professor' : 'Equipamento'}
@@ -289,16 +292,13 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* --- SEÇÃO DINÂMICA DE FILTROS RETRÁTEIS --- */}
+        {/* FILTROS RETRÁTEIS */}
         <div className={`rounded-2xl bg-[#111]/80 border border-white/5 shadow-xl p-6 flex flex-wrap items-center gap-4 transition-all duration-300 mb-8 ${filtrosExpandidos ? 'opacity-100 max-h-[500px]' : 'opacity-0 max-h-0 !p-0 !border-none overflow-hidden !mb-0'}`}>
-          
-          {/* BARRA DE PESQUISA */}
           <div className="flex-1 min-w-[250px]">
             <label className="text-[9px] font-bold uppercase tracking-wider text-[#d1a661] mb-1.5 block ml-1">Pesquisa Direta</label>
             <input type="text" placeholder={`Procurar termo em ${abaAtiva}...`} value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#d1a661]/50 placeholder:text-zinc-600 h-[40px]" />
           </div>
 
-          {/* Seletor de Professores */}
           <div className="flex-1 min-w-[200px]">
             <label className="text-[9px] font-bold uppercase tracking-wider text-[#d1a661] mb-1.5 block ml-1">Professor</label>
             <select 
@@ -313,7 +313,6 @@ export default function AdminDashboard() {
             </select>
           </div>
 
-          {/* Seletor de Status - EXIBIDO CONDICIONALMENTE APENAS NA ABA RESERVAS */}
           {abaAtiva === 'reservas' && (
             <div className="flex-1 min-w-[200px]">
               <label className="text-[9px] font-bold uppercase tracking-wider text-[#d1a661] mb-1.5 block ml-1">Status Reserva</label>
@@ -330,7 +329,6 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Botão de Limpar */}
           {(filtroProf || filtroStatus || busca) && (
             <button 
               onClick={() => { setFiltroProf(''); setFiltroStatus(''); setBusca(''); }}
@@ -377,8 +375,8 @@ export default function AdminDashboard() {
                           <p className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider mt-1">
                             {abaAtiva === 'reservas' 
                               ? `${item.professor_email} • ${item.data_reserva} • ${item.horario_inicio} (${item.status_reserva || 'solicitada'})` 
-                              : (item.patrimonio 
-                                  ? `Patrimônio: ${item.patrimonio} • ${item.marca || ''} (${item.estado_conservacao || 'Bom'}) • Status: ${item.status || 'disponivel'}` 
+                              : (item.marca 
+                                  ? `${item.marca} (${item.modelo || ''}) • Conservação: ${item.estado_conservacao || 'Bom'} • Status: ${item.status || 'disponivel'}` 
                                   : `Categoria: ${item.categoria || 'Não informada'} ${item.email || ''}`)}
                           </p>
                         </div>
@@ -399,7 +397,6 @@ export default function AdminDashboard() {
                           </>
                         ) : (
                           <>
-                            {/* BOTÃO DE MANUTENÇÃO */}
                             {abaAtiva === 'equipamentos' && (
                               <button 
                                 onClick={() => handleAlternarManutencao(item)}
@@ -409,7 +406,6 @@ export default function AdminDashboard() {
                               </button>
                             )}
 
-                            {/* BOTÃO DE RELATÓRIO INDIVIDUAL */}
                             {abaAtiva === 'professores' && (
                               <button 
                                 onClick={() => handleGerarRelatorioProfessor(item)}
@@ -426,12 +422,9 @@ export default function AdminDashboard() {
                                   nome: item.nome || '', 
                                   categoria: item.categoria || 'Multimídia', 
                                   imagem: item.imagem || '',
-                                  patrimonio: item.patrimonio || '',
                                   marca: item.marca || '',
                                   modelo: item.modelo || '',
-                                  numero_serie: item.numero_serie || '',
                                   estado_conservacao: item.estado_conservacao || 'Bom',
-                                  observacoes: item.observacoes || '',
                                   status: item.status || 'disponivel'
                                 });
                                 setShowModalEquip(true);
@@ -478,62 +471,62 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-black mb-6 text-white uppercase text-center">{editandoId ? 'Editar' : 'Novo'} <span className="text-[#d1a661]">Equipamento</span></h2>
             
             <form onSubmit={handleAddEquipamento} className="space-y-4">
-  {/* LINHA 1: NOME E CATEGORIA */}
-  <div className="grid grid-cols-2 gap-4">
-    <div>
-      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Nome</label>
-      <input required placeholder="Ex: Câmera Mirrorless" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.nome} onChange={(e) => setNovoEquip({...novoEquip, nome: e.target.value})} />
-    </div>
-    <div>
-      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Categoria</label>
-      <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none text-sm h-[46px] cursor-pointer" value={novoEquip.categoria} onChange={(e) => setNovoEquip({...novoEquip, categoria: e.target.value})}>
-        {['Laboratório', 'Multimídia', 'Informática', 'Fotografia', 'Áudio', 'Vídeo'].map(c => <option key={c} value={c}>{c}</option>)}
-      </select>
-    </div>
-  </div>
+              {/* LINHA 1: NOME E CATEGORIA */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Nome</label>
+                  <input required placeholder="Ex: Câmera Mirrorless" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.nome} onChange={(e) => setNovoEquip({...novoEquip, nome: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Categoria</label>
+                  <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none text-sm h-[46px] cursor-pointer" value={novoEquip.categoria} onChange={(e) => setNovoEquip({...novoEquip, categoria: e.target.value})}>
+                    {['Laboratório', 'Multimídia', 'Informática', 'Fotografia', 'Áudio'].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
 
-  {/* LINHA 2: MARCA E MODELO */}
-  <div className="grid grid-cols-2 gap-4">
-    <div>
-      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Marca</label>
-      <input required placeholder="Ex: Sony" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.marca} onChange={(e) => setNovoEquip({...novoEquip, marca: e.target.value})} />
-    </div>
-    <div>
-      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Modelo</label>
-      <input required placeholder="Ex: Alpha a7 III" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.modelo} onChange={(e) => setNovoEquip({...novoEquip, modelo: e.target.value})} />
-    </div>
-  </div>
+              {/* LINHA 2: MARCA E MODELO */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Marca</label>
+                  <input required placeholder="Ex: Sony" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.marca} onChange={(e) => setNovoEquip({...novoEquip, marca: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Modelo</label>
+                  <input required placeholder="Ex: Alpha a7 III" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.modelo} onChange={(e) => setNovoEquip({...novoEquip, modelo: e.target.value})} />
+                </div>
+              </div>
 
-  {/* LINHA 3: ESTADO DE CONSERVAÇÃO E SELEÇÃO DE ARQUIVO LOCAL */}
-  <div className="grid grid-cols-2 gap-4 items-end">
-    <div>
-      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Estado de Conservação</label>
-      <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none text-sm h-[46px] cursor-pointer" value={novoEquip.estado_conservacao} onChange={(e) => setNovoEquip({...novoEquip, estado_conservacao: e.target.value})}>
-        {['Excelente', 'Bom', 'Regular', 'Ruim'].map(status => <option key={status} value={status}>{status}</option>)}
-      </select>
-    </div>
-    <div>
-      <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Upload de Foto (Local)</label>
-      <div className="h-[46px] flex items-center bg-zinc-900 border border-white/5 rounded-xl px-3">
-        <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'equipamentos')} className="w-full text-xs text-zinc-500 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-zinc-800 file:text-white hover:file:bg-zinc-700 cursor-pointer" />
-      </div>
-    </div>
-  </div>
+              {/* LINHA 3: ESTADO DE CONSERVAÇÃO E SELEÇÃO DE ARQUIVO LOCAL */}
+              <div className="grid grid-cols-2 gap-4 items-end">
+                <div>
+                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Estado de Conservação</label>
+                  <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none text-sm h-[46px] cursor-pointer" value={novoEquip.estado_conservacao} onChange={(e) => setNovoEquip({...novoEquip, estado_conservacao: e.target.value})}>
+                    {['Excelente', 'Bom', 'Regular', 'Ruim'].map(status => <option key={status} value={status}>{status}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Upload de Foto (Local)</label>
+                  <div className="h-[46px] flex items-center bg-zinc-900 border border-white/5 rounded-xl px-3">
+                    <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'equipamentos')} className="w-full text-xs text-zinc-500 file:mr-3 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-zinc-800 file:text-white hover:file:bg-zinc-700 cursor-pointer" />
+                  </div>
+                </div>
+              </div>
 
-  {/* LINHA 4: ADICIONAR IMAGEM POR LINK (LARGURA TOTAL) */}
-  <div>
-    <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Ou link da imagem externa</label>
-    <input placeholder="Ex: https://site.com/imagem-do-equipamento.jpg" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.imagem} onChange={(e) => setNovoEquip({...novoEquip, imagem: e.target.value})} />
-  </div>
+              {/* LINHA 4: ADICIONAR IMAGEM POR LINK (LARGURA TOTAL) */}
+              <div>
+                <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Ou link da imagem externa</label>
+                <input placeholder="Ex: https://site.com/imagem-do-equipamento.jpg" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.imagem} onChange={(e) => setNovoEquip({...novoEquip, imagem: e.target.value})} />
+              </div>
 
-  {/* LINHA 5: BOTÕES DE AÇÃO */}
-  <div className="pt-2">
-    <button type="submit" disabled={uploading} className="w-full bg-[#d1a661] text-black font-black py-4 rounded-xl uppercase text-xs tracking-widest shadow-lg hover:scale-[1.02] transition-transform">
-      {uploading ? 'Processando Upload...' : 'Confirmar Registro'}
-    </button>
-    <button onClick={() => setShowModalEquip(false)} type="button" className="w-full text-zinc-500 text-[10px] uppercase font-bold tracking-widest pt-4">Cancelar</button>
-  </div>
-</form>
+              {/* LINHA 5: BOTÕES DE AÇÃO */}
+              <div className="pt-2">
+                <button type="submit" disabled={uploading} className="w-full bg-[#d1a661] text-black font-black py-4 rounded-xl uppercase text-xs tracking-widest shadow-lg hover:scale-[1.02] transition-transform">
+                  {uploading ? 'Processando Upload...' : 'Confirmar Registro'}
+                </button>
+                <button onClick={() => setShowModalEquip(false)} type="button" className="w-full text-zinc-500 text-[10px] uppercase font-bold tracking-widest pt-4">Cancelar</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

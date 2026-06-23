@@ -25,9 +25,15 @@ export default function PresentationPage() {
         </motion.div>
 
         <div className="hidden lg:flex gap-10 text-[10px] uppercase tracking-[0.3em] font-bold text-gray-500">
-          <a href="#" className="hover:text-white transition-colors">Catálogo Profissional</a>
-          <a href="#" className="hover:text-white transition-colors">Como Funciona</a>
-          <a href="#" className="hover:text-white transition-colors">Termos de Uso</a>
+          <Link href="/home/catalogo" className="hover:text-white transition-colors">
+            Catálogo Geral
+          </Link>
+          <Link href="/home/como-funciona" className="hover:text-white transition-colors">
+            Como Funciona
+          </Link>
+          <Link href="/home/termos" className="hover:text-white transition-colors">
+            Termos de Uso
+          </Link>
         </div>
 
         <Link href="/login">
@@ -79,12 +85,17 @@ export default function PresentationPage() {
             transition={{ delay: 0.6 }}
             className="flex flex-wrap gap-6"
           >
-            <button className="bg-[#C5A059] text-black px-10 py-5 rounded-full text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(197,160,89,0.2)] hover:scale-105 transition-transform">
-              Ver Catálogo
-            </button>
-            <button className="border border-white/10 bg-white/5 backdrop-blur-md text-white px-10 py-5 rounded-full text-[11px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-colors">
-              Como Funciona
-            </button>
+            <Link href="/home/catalogo">
+              <button className="bg-[#C5A059] text-black px-10 py-5 rounded-full text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(197,160,89,0.2)] hover:scale-105 transition-transform">
+                Ver Catálogo
+              </button>
+            </Link>
+            
+            <Link href="/home/como-funciona">
+              <button className="border border-white/10 bg-white/5 backdrop-blur-md text-white px-10 py-5 rounded-full text-[11px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-colors">
+                Como Funciona
+              </button>
+            </Link>
           </motion.div>
 
           <motion.div 
@@ -137,7 +148,7 @@ export default function PresentationPage() {
                     Caixa de som
                   </h4>
                   <p className="text-gray-400 text-xs mb-6 font-light">
-                   Som de alta qualidade, caixa com acesso Bluetooth
+                    Som de alta qualidade, caixa com acesso Bluetooth
                   </p>
                   <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-green-500/10 text-green-500 text-[9px] font-bold uppercase tracking-[0.2em] rounded-full border border-green-500/20">
                     <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
@@ -159,8 +170,12 @@ export default function PresentationPage() {
           © 2026 UPLOC — Tecnologia para o Futuro do Audiovisual
         </div>
         <div className="flex gap-6 text-[9px] uppercase tracking-widest text-gray-500">
-          <span className="hover:text-white cursor-pointer">Privacidade</span>
-          <span className="hover:text-white cursor-pointer">Suporte Técnico</span>
+          <Link href="/home/privacidade" className="hover:text-white cursor-pointer">
+            Privacidade
+          </Link>
+          <span className="hover:text-white cursor-default">
+            Suporte Técnico
+          </span>
         </div>
       </footer>
 

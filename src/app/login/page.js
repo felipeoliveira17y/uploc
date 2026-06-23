@@ -56,7 +56,7 @@ export default function LoginPage() {
           onClick={() => router.push('/home')}
           className="mb-8 rounded-full border border-white/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 transition-all hover:border-uploc-gold/30 hover:text-uploc-gold"
         >
-          ← Voltar para Home
+          ← Voltar
         </button>
 
         <div className="mb-12 text-center uppercase tracking-[0.4em]">

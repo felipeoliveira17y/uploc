@@ -122,7 +122,7 @@ export default function ComoFuncionaPage() {
         >
           <Link href="/home/catalogo">
             <button className="bg-[#C5A059] text-black px-10 py-4 rounded-full text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(197,160,89,0.1)] hover:scale-105 transition-transform">
-              Explorar Acervo Agora
+              Explorar Catálogo Agora
             </button>
           </Link>
         </motion.div>

@@ -154,7 +154,6 @@ export default function AdminDashboard() {
   async function handleAddEquipamento(e) {
     e.preventDefault();
     
-    // Filtramos o payload para enviar ao banco APENAS as colunas válidas existentes
     const payload = {
       nome: novoEquip.nome,
       categoria: novoEquip.categoria,
@@ -217,11 +216,178 @@ export default function AdminDashboard() {
     }
   }
 
-  function handleGerarRelatorioProfessor(professor) {
-    alert(`Gerando arquivo consolidado de auditoria UPLOC (PDF/CSV) para o docente:\n\n` +
-          `Nome: ${professor.nome_completo}\n` +
-          `E-mail: ${professor.email}\n\n` +
-          `Apenas as reservas deste professor serão consolidadas.`);
+  // --- MOTOR DE AUDITORIA E RELATÓRIO INDIVIDUAL (PDF/IMPRESSÃO) ---
+  async function handleGerarRelatorioProfessor(professor) {
+    setLoading(true);
+    try {
+      // Busca todas as reservas atreladas ao e-mail/identificação do professor no banco
+      const { data: reservasDocente, error } = await supabase
+        .from('reservas')
+        .select('*')
+        .eq('professor_email', professor.email)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Montagem do HTML customizado e temporário para a janela de impressão
+      const printWindow = window.open('', '_blank');
+      const dataEmissao = new Date().toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      const htmlReservas = reservasDocente && reservasDocente.length > 0 
+        ? reservasDocente.map(res => `
+            <tr style="border-bottom: 1px solid #e4e4e7;">
+              <td style="padding: 12px; font-size: 12px; color: #3f3f46;">#${res.id}</td>
+              <td style="padding: 12px; font-size: 12px; color: #18181b; font-weight: 600;">${res.nome_equipamento || 'Equipamento não identificado'}</td>
+              <td style="padding: 12px; font-size: 12px; color: #3f3f46;">${res.data_reserva} às ${res.horario_inicio}</td>
+              <td style="padding: 12px; font-size: 12px; text-transform: uppercase; font-weight: bold; color: ${res.status_reserva === 'finalizada' ? '#16a34a' : '#ca8a04'}">
+                ${res.status_reserva || 'Pendente'}
+              </td>
+            </tr>
+          `).join('')
+        : `<tr><td colspan="4" style="padding: 24px; text-align: center; color: #a1a1aa; font-size: 13px;">Nenhum histórico de reserva encontrado para este docente.</td></tr>`;
+
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Relatório de Auditoria - UPLOC</title>
+            <style>
+              body { font-family: sans-serif; padding: 40px; color: #18181b; background: #fff; }
+              .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d1a661; padding-bottom: 20px; margin-bottom: 30px; }
+              .logo { font-size: 24px; font-weight: 900; tracking-spacing: 2px; color: #0a0a0a; }
+              .logo span { color: #d1a661; }
+              .title { font-size: 14px; text-transform: uppercase; color: #71717a; font-weight: bold; text-align: right; }
+              .meta-box { background: #fafafa; border: 1px solid #e4e4e7; padding: 20px; rounded-radius: 12px; margin-bottom: 30px; }
+              .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; }
+              table { w-full; width: 100%; border-collapse: collapse; margin-top: 10px; }
+              th { background: #f4f4f5; color: #18181b; font-size: 11px; text-transform: uppercase; font-weight: 900; padding: 12px; text-align: left; border-bottom: 1px solid #e4e4e7; }
+              .footer { margin-top: 60px; border-top: 1px solid #e4e4e7; padding-top: 15px; text-align: center; font-size: 10px; color: #a1a1aa; text-transform: uppercase; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="logo">UP<span>LOC</span></div>
+              <div class="title">Consolidado de Auditoria Digital</div>
+            </div>
+            
+            <div class="meta-box">
+              <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 14px; text-transform: uppercase; color: #d1a661;">Dados do Docente</h3>
+              <div class="meta-grid">
+                <div><b>Nome Completo:</b> ${professor.nome_completo}</div>
+                <div><b>E-mail Institucional:</b> ${professor.email}</div>
+                <div><b>Data de Emissão:</b> ${dataEmissao}</div>
+                <div><b>Total de Registros:</b> ${reservasDocente?.length || 0} reserva(s)</div>
+              </div>
+            </div>
+
+            <h3 style="font-size: 14px; text-transform: uppercase; margin-bottom: 10px; color: #27272a;">Histórico Analítico de Reservas</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Equipamento</th>
+                  <th>Período Agendado</th>
+                  <th>Status Atual</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${htmlReservas}
+              </tbody>
+            </table>
+
+            <div class="footer">
+              © 2026 UPLOC — Sistema de Gestão de Infraestrutura Audiovisual — Relatório Oficial Autenticado
+            </div>
+            <script>
+              window.onload = function() { window.print(); window.close(); }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (err) {
+      alert("Erro ao consolidar relatório: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // --- COMPILADOR DE RELATÓRIO GERAL DA ABA EM USO ---
+  function handleGerarRelatorioGeral() {
+    if (dadosFiltrados.length === 0) {
+      alert("Não há dados filtrados disponíveis para exportação.");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    const dataEmissao = new Date().toLocaleDateString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    const headersTabela = abaAtiva === 'equipamentos' 
+      ? `<tr><th>Nome</th><th>Categoria</th><th>Marca/Modelo</th><th>Estado</th><th>Status</th></tr>`
+      : abaAtiva === 'professores'
+      ? `<tr><th>Nome</th><th>E-mail</th><th>Função</th></tr>`
+      : `<tr><th>ID Reserva</th><th>Docente</th><th>Data/Hora</th><th>Status</th></tr>`;
+
+    const linhasTabela = dadosFiltrados.map(item => {
+      if (abaAtiva === 'equipamentos') {
+        return `
+          <tr style="border-bottom: 1px solid #e4e4e7; font-size: 12px;">
+            <td style="padding: 12px; font-weight:bold;">${item.nome}</td>
+            <td style="padding: 12px;">${item.categoria}</td>
+            <td style="padding: 12px;">${item.marca} ${item.modelo || ''}</td>
+            <td style="padding: 12px;">${item.estado_conservacao}</td>
+            <td style="padding: 12px; text-transform: uppercase; font-weight: bold; color: ${item.status === 'disponivel' ? '#16a34a' : '#ea580c'}">${item.status}</td>
+          </tr>`;
+      } else if (abaAtiva === 'professores') {
+        return `
+          <tr style="border-bottom: 1px solid #e4e4e7; font-size: 12px;">
+            <td style="padding: 12px; font-weight:bold;">${item.nome_completo}</td>
+            <td style="padding: 12px;">${item.email}</td>
+            <td style="padding: 12px; text-transform: uppercase;">${item.role}</td>
+          </tr>`;
+      } else {
+        return `
+          <tr style="border-bottom: 1px solid #e4e4e7; font-size: 12px;">
+            <td style="padding: 12px;">#${item.id}</td>
+            <td style="padding: 12px; font-weight:bold;">${item.professor_email}</td>
+            <td style="padding: 12px;">${item.data_reserva} às ${item.horario_inicio}</td>
+            <td style="padding: 12px; text-transform: uppercase; font-weight:bold;">${item.status_reserva || 'solicitada'}</td>
+          </tr>`;
+      }
+    }).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Relatório Geral UPLOC - ${abaAtiva}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #18181b; }
+            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #d1a661; padding-bottom: 20px; margin-bottom: 30px; }
+            .logo { font-size: 24px; font-weight: 900; color: #0a0a0a; }
+            .logo span { color: #d1a661; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background: #f4f4f5; color: #18181b; font-size: 11px; text-transform: uppercase; font-weight:900; padding: 12px; text-align: left; border-bottom: 1px solid #e4e4e7; }
+            .footer { margin-top: 60px; border-top: 1px solid #e4e4e7; padding-top: 15px; text-align: center; font-size: 10px; color: #a1a1aa; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">UP<span>LOC</span></div>
+            <div style="text-align: right;">
+              <div style="font-size: 14px; font-weight: bold; text-transform: uppercase; color: #d1a661;">Relatório Geral Ambulatorial</div>
+              <div style="font-size: 11px; color: #71717a; margin-top: 4px;">Segmentação: Módulo de ${abaAtiva}</div>
+            </div>
+          </div>
+          <p style="font-size: 12px; color: #71717a;"><b>Emitido em:</b> ${dataEmissao} | <b>Totalizador de Linhas:</b> ${dadosFiltrados.length} encontrados.</p>
+          <table>
+            <thead>${headersTabela}</thead>
+            <tbody>${linhasTabela}</tbody>
+          </table>
+          <div class="footer">© 2026 UPLOC — Extração de Dados do Sistema Operacional de Triagem</div>
+          <script>window.onload = function() { window.print(); window.close(); }</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   }
 
   const dadosFiltrados = dados.filter(item => {
@@ -276,6 +442,14 @@ export default function AdminDashboard() {
           </div>
           
           <div className="flex items-center gap-3">
+            {/* BOTÃO EXPORTAR RELATÓRIO DA ABA ATUAL */}
+            <button 
+              onClick={handleGerarRelatorioGeral}
+              className="border border-white/10 bg-white/5 hover:bg-white/10 text-white px-5 py-3 rounded-xl font-bold text-xs uppercase transition-colors tracking-wider whitespace-nowrap"
+            >
+              📊 Exportar Dados Atual
+            </button>
+
             <div 
               onClick={() => setFiltrosExpandidos(!filtrosExpandidos)}
               className={`px-5 py-3 rounded-xl border transition-all cursor-pointer flex items-center gap-3 select-none text-xs ${filtrosExpandidos ? 'border-[#d1a661] bg-[#d1a661]/5 text-[#d1a661]' : 'border-white/5 bg-[#111]/60 text-zinc-400 hover:border-white/20'}`}
@@ -471,7 +645,6 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-black mb-6 text-white uppercase text-center">{editandoId ? 'Editar' : 'Novo'} <span className="text-[#d1a661]">Equipamento</span></h2>
             
             <form onSubmit={handleAddEquipamento} className="space-y-4">
-              {/* LINHA 1: NOME E CATEGORIA */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Nome</label>
@@ -485,7 +658,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* LINHA 2: MARCA E MODELO */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Marca</label>
@@ -497,7 +669,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* LINHA 3: ESTADO DE CONSERVAÇÃO E SELEÇÃO DE ARQUIVO LOCAL */}
               <div className="grid grid-cols-2 gap-4 items-end">
                 <div>
                   <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Estado de Conservação</label>
@@ -513,13 +684,11 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* LINHA 4: ADICIONAR IMAGEM POR LINK (LARGURA TOTAL) */}
               <div>
                 <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest mb-1 block">Ou link da imagem externa</label>
                 <input placeholder="Ex: https://site.com/imagem-do-equipamento.jpg" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d1a661]/50 text-sm" value={novoEquip.imagem} onChange={(e) => setNovoEquip({...novoEquip, imagem: e.target.value})} />
               </div>
 
-              {/* LINHA 5: BOTÕES DE AÇÃO */}
               <div className="pt-2">
                 <button type="submit" disabled={uploading} className="w-full bg-[#d1a661] text-black font-black py-4 rounded-xl uppercase text-xs tracking-widest shadow-lg hover:scale-[1.02] transition-transform">
                   {uploading ? 'Processando Upload...' : 'Confirmar Registro'}

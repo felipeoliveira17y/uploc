@@ -5,7 +5,30 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
 const CATEGORIAS = ['Todos', 'Laboratório', 'Multimídia', 'Informática', 'Fotografia', 'Áudio'];
-const HORARIOS = ['07:30 - 08:20', '08:20 - 09:10', '09:20 - 10:10', '10:10 - 11:00', '13:30 - 14:20', '14:20 - 15:10'];
+
+// Grade escolar com 9 aulas de 50 minutos
+const HORARIOS = [
+  '07:20 - 08:10',
+  '08:10 - 09:00',
+  '09:20 - 10:10',
+  '10:10 - 11:00',
+  '11:00 - 11:50',
+  '13:10 - 14:00',
+  '14:00 - 14:50',
+  '15:10 - 16:00',
+  '16:00 - 16:50'
+];
+
+// --- FUNÇÃO ISOLADA FORA DO COMPONENTE (EVITA REFERENCEERROR NO TURBOPACK) ---
+const obterDadosBrasilia = (dataObjeto) => {
+  const formatadorData = new Intl.DateTimeFormat('fr-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const formatadorHora = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', hour12: false });
+  
+  return {
+    dataAtualYMD: formatadorData.format(dataObjeto), // Retorna 'YYYY-MM-DD'
+    horaAtualHM: formatadorHora.format(dataObjeto)   // Retorna 'HH:MM'
+  };
+};
 
 export default function TelaLocacaoEscolar() {
   const supabase = createClient();
@@ -20,6 +43,20 @@ export default function TelaLocacaoEscolar() {
   const [dataReserva, setDataReserva] = useState('');
   const [horariosSelecionados, setHorariosSelecionados] = useState([]);
   const [motivo, setMotivo] = useState('');
+  
+  // Estado para armazenar horários ocupados no banco de dados
+  const [horariosBloqueados, setHorariosBloqueados] = useState([]);
+
+  // Controlar o relógio interno para atualizar os bloqueios por tempo em tempo real
+  const [agoraBrasilia, setAgoraBrasilia] = useState(new Date());
+
+  // Atualiza o relógio a cada 30 segundos para pegar mudanças de horário em tempo real
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAgoraBrasilia(new Date());
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // 1. BUSCAR EQUIPAMENTOS DO BANCO
   async function fetchEquipamentos() {
@@ -37,8 +74,36 @@ export default function TelaLocacaoEscolar() {
     fetchEquipamentos();
   }, []);
 
+  // 2. VERIFICAR RESERVAS EXISTENTES PARA A DATA SELECIONADA
+  useEffect(() => {
+    async function checarHorariosDisponiveis() {
+      if (!dataReserva || !itemSelecionado) {
+        setHorariosBloqueados([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('reservas')
+        .select('horario_inicio')
+        .eq('equipamento_id', itemSelecionado.id)
+        .eq('data_reserva', dataReserva);
+
+      if (!error && data) {
+        const ocupados = data.flatMap(reserva => 
+          reserva.horario_inicio.split(',').map(h => h.trim())
+        );
+        setHorariosBloqueados(ocupados);
+        setHorariosSelecionados(prev => prev.filter(h => !ocupados.includes(h)));
+      }
+    }
+
+    checarHorariosDisponiveis();
+  }, [dataReserva, itemSelecionado]);
+
   // Lógica para selecionar múltiplos horários
   const toggleHorario = (h) => {
+    if (horariosBloqueados.includes(h)) return;
+
     if (horariosSelecionados.includes(h)) {
       setHorariosSelecionados(horariosSelecionados.filter(item => item !== h));
     } else {
@@ -46,7 +111,7 @@ export default function TelaLocacaoEscolar() {
     }
   };
 
-  // 2. FUNÇÃO PARA CONFIRMAR RESERVA
+  // 3. FUNÇÃO PARA CONFIRMAR RESERVA
   const confirmarReserva = async () => {
     if (!dataReserva || horariosSelecionados.length === 0) {
       alert("Selecione a data e pelo menos um horário.");
@@ -84,6 +149,7 @@ export default function TelaLocacaoEscolar() {
   const fecharModal = () => {
     setItemSelecionado(null);
     setHorariosSelecionados([]);
+    setHorariosBloqueados([]);
     setMotivo('');
     setDataReserva('');
   };
@@ -106,13 +172,12 @@ export default function TelaLocacaoEscolar() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-10">
-        {/* TITULO E BOTAO VOLTAR */}
+        {/* TITULO */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12">
           <div className="flex items-center gap-4 mb-2">
             <button 
               onClick={() => router.push('/home')} 
               className="flex items-center justify-center w-10 h-10 rounded-full bg-[#222222] border border-white/5 text-zinc-400 hover:text-[#d1a661] hover:border-[#d1a661]/40 transition-all text-lg"
-              title="Voltar para a Home"
             >
               ←
             </button>
@@ -123,7 +188,7 @@ export default function TelaLocacaoEscolar() {
           <div className="h-1 w-20 bg-[#d1a661] ml-14"></div>
         </motion.div>
 
-        {/* ABAS DE CATEGORIAS */}
+        {/* ABAS */}
         <div className="flex gap-2 mb-10 overflow-x-auto border-b border-white/5 no-scrollbar">
           {CATEGORIAS.map((cat) => (
             <button
@@ -139,7 +204,7 @@ export default function TelaLocacaoEscolar() {
           ))}
         </div>
 
-        {/* GRID DE EQUIPAMENTOS */}
+        {/* GRID */}
         {loading ? (
           <div className="text-center py-20 text-[#d1a661] animate-pulse font-black uppercase tracking-widest">Sincronizando banco de dados...</div>
         ) : (
@@ -163,12 +228,9 @@ export default function TelaLocacaoEscolar() {
                 </div>
                 <div className="p-6">
                   <h3 className="font-bold text-lg text-white mb-1 h-12 line-clamp-2 group-hover:text-[#d1a661] transition-colors">{item.nome}</h3>
-                  
-                  {/* NOVOS CAMPOS EXIBIDOS DE FORMA COMPACTA NO CARD */}
                   <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider mb-4 truncate">
                     {item.marca && item.modelo ? `${item.marca} • ${item.modelo}` : 'Especificação não informada'}
                   </p>
-
                   <div className="flex items-center justify-between border-t border-white/5 pt-3">
                     <span className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">
                       {item.patrimonio ? `PAT: ${item.patrimonio}` : 'Disponível'}
@@ -185,7 +247,7 @@ export default function TelaLocacaoEscolar() {
         )}
       </main>
 
-      {/* MODAL DE RESERVA ATUALIZADO */}
+      {/* MODAL DE RESERVA */}
       <AnimatePresence>
         {itemSelecionado && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
@@ -206,18 +268,11 @@ export default function TelaLocacaoEscolar() {
               <div className="px-10 pb-10 pt-6 relative z-10">
                 <h2 className="text-[#d1a661] text-2xl font-black uppercase italic leading-tight">{itemSelecionado.nome}</h2>
                 
-                {/* BLOCo ADICIONAL: ESPECIFICAÇÕES TÉCNICAS DO PRODUTO */}
                 <div className="mt-4 p-4 bg-zinc-900/60 rounded-2xl border border-white/5 grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
                   <div><span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Marca / Modelo:</span> <span className="text-zinc-200 font-medium">{itemSelecionado.marca || '—'} {itemSelecionado.modelo || '—'}</span></div>
                   <div><span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Nº de Patrimônio:</span> <span className="text-zinc-200 font-mono font-bold">{itemSelecionado.patrimonio || '—'}</span></div>
                   <div><span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Nº de Série:</span> <span className="text-zinc-400 font-mono">{itemSelecionado.numero_serie || '—'}</span></div>
                   <div><span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Estado do Objeto:</span> <span className="text-green-400 font-bold uppercase text-[10px]">{itemSelecionado.estado_conservacao || 'Bom'}</span></div>
-                  {itemSelecionado.observacoes && (
-                    <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
-                      <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-wider">Observações de Uso:</span>
-                      <p className="text-zinc-400 italic text-[10px] leading-relaxed">{itemSelecionado.observacoes}</p>
-                    </div>
-                  )}
                 </div>
 
                 <div className="mt-6 space-y-5">
@@ -227,21 +282,50 @@ export default function TelaLocacaoEscolar() {
                   </div>
 
                   <div>
-                    <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest block mb-2">Selecione os Horários ({horariosSelecionados.length})</label>
+                    <label className="text-[9px] font-black text-[#d1a661] uppercase tracking-widest block mb-2">
+                      {!dataReserva ? "Selecione uma data para ver os horários" : `Selecione os Horários (${horariosSelecionados.length})`}
+                    </label>
                     <div className="grid grid-cols-2 gap-2">
-                      {HORARIOS.map((h) => (
-                        <button
-                          key={h}
-                          onClick={() => toggleHorario(h)}
-                          className={`text-center p-3 rounded-xl text-[9px] font-bold uppercase transition-all border ${
-                            horariosSelecionados.includes(h)
-                              ? 'bg-[#d1a661] text-black border-[#d1a661]'
-                              : 'bg-zinc-900/50 text-zinc-500 border-white/5 hover:border-white/20'
-                          }`}
-                        >
-                          {h}
-                        </button>
-                      ))}
+                      {HORARIOS.map((h) => {
+                        const { dataAtualYMD, horaAtualHM } = obterDadosBrasilia(agoraBrasilia);
+                        
+                        // Captura o faturamento do horário de início da aula (Ex: "07:20")
+                        const horarioInicioAula = h.split(' - ')[0];
+
+                        const jaOcupadoNoBanco = horariosBloqueados.includes(h);
+                        
+                        // Verificações temporais:
+                        const dataPassada = dataReserva < dataAtualYMD;
+                        const horaPassadaHoje = dataReserva === dataAtualYMD && horaAtualHM >= horarioInicioAula;
+                        
+                        // Se o dia já passou OU se o dia é hoje e a hora da aula já passou
+                        const jaPassouDoHorario = dataPassada || horaPassadaHoje;
+
+                        const estaDesabilitado = jaOcupadoNoBanco || jaPassouDoHorario;
+                        const estaSelecionado = horariosSelecionados.includes(h);
+
+                        return (
+                          <button
+                            key={h}
+                            type="button"
+                            disabled={estaDesabilitado || !dataReserva}
+                            onClick={() => toggleHorario(h)}
+                            className={`text-center p-3 rounded-xl text-[9px] font-bold uppercase transition-all border ${
+                              !dataReserva 
+                                ? 'bg-zinc-900/20 text-zinc-700 border-white/5 cursor-not-allowed'
+                                : jaOcupadoNoBanco
+                                ? 'bg-red-950/40 text-red-400/50 border-red-900/30 line-through cursor-not-allowed'
+                                : jaPassouDoHorario
+                                ? 'bg-zinc-800/40 text-zinc-600 border-zinc-900/50 line-through cursor-not-allowed'
+                                : estaSelecionado
+                                ? 'bg-[#d1a661] text-black border-[#d1a661]'
+                                : 'bg-zinc-900/50 text-zinc-500 border-white/5 hover:border-white/20'
+                            }`}
+                          >
+                            {h} {jaOcupadoNoBanco ? '• Ocupado' : jaPassouDoHorario ? '• Encerrado' : ''}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -271,4 +355,4 @@ export default function TelaLocacaoEscolar() {
       </AnimatePresence>
     </div>
   );
-} 
+}

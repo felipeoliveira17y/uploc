@@ -3,8 +3,39 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+// Importação do cliente Supabase configurado no seu projeto
+import { createClient } from "@/utils/supabase/client";
 
 export default function PresentationPage() {
+  // Inicialização do cliente Supabase
+  const supabase = createClient();
+
+  // Estados para gerenciar a contagem dinâmica de itens do banco de dados
+  const [totalItens, setTotalItens] = useState(150); // Valor padrão inicial (fallback)
+  const [carregandoContagem, setCarregandoContagem] = useState(true);
+
+  // Efeito para disparar a consulta de agregação no banco de dados
+  useEffect(() => {
+    async function buscarTotalEquipamentos() {
+      try {
+        // Busca otimizada: head: true não traz os registros, apenas a contagem exata de linhas
+        const { count, error } = await supabase
+          .from("equipamentos")
+          .select("*", { count: "exact", head: true });
+
+        if (!error && count !== null) {
+          setTotalItens(count);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar a contagem de equipamentos ativos:", err);
+      } finally {
+        setCarregandoContagem(false);
+      }
+    }
+
+    buscarTotalEquipamentos();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white selection:bg-[#C5A059] selection:text-black overflow-x-hidden">
       
@@ -98,6 +129,7 @@ export default function PresentationPage() {
             </Link>
           </motion.div>
 
+          {/* --- INDICADORES DINÂMICOS SINCROIZADOS --- */}
           <motion.div 
              initial={{ opacity: 0 }}
              animate={{ opacity: 1 }}
@@ -105,7 +137,13 @@ export default function PresentationPage() {
              className="grid grid-cols-3 gap-8 pt-8 border-t border-white/5"
           >
             <div>
-              <div className="text-2xl font-bold">150+</div>
+              <div className="text-2xl font-bold flex items-center gap-1">
+                {carregandoContagem ? (
+                  <span className="w-12 h-6 bg-zinc-800 animate-pulse rounded-md inline-block" />
+                ) : (
+                  `${totalItens}+`
+                )}
+              </div>
               <div className="text-[10px] uppercase tracking-widest text-gray-500">Itens Ativos</div>
             </div>
             <div>

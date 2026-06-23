@@ -1,207 +1,230 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import Link from 'next/link';
 import { createClient } from '@/utils/supabase/client';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-export default function CatalogoPage() {
-  const [equipamentos, setEquipamentos] = useState([]);
-  const [busca, setBusca] = useState('');
-  const [categoriaFiltrada, setCategoriaFiltrada] = useState('');
-  const [loading, setLoading] = useState(true);
+const CATEGORIAS = ['Todos', 'Laboratório', 'Multimídia', 'Informática', 'Fotografia', 'Áudio'];
 
+export default function TelaCatalogoDemonstrativo() {
   const supabase = createClient();
+  const router = useRouter();
 
-  // Buscar itens do banco de dados
-  async function carregarCatalogo() {
+  const [equipamentos, setEquipamentos] = useState([]);
+  const [abaAtiva, setAbaAtiva] = useState('Todos');
+  const [loading, setLoading] = useState(true);
+  const [itemSelecionado, setItemSelecionado] = useState(null);
+
+  // BUSCAR EQUIPAMENTOS DO BANCO
+  async function fetchEquipamentos() {
     setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('equipamentos')
-        .select('*')
-        .order('nome', { ascending: true });
+    const { data, error } = await supabase
+      .from('equipamentos')
+      .select('*')
+      .order('nome', { ascending: true });
 
-      if (error) throw error;
-      setEquipamentos(data || []);
-    } catch (err) {
-      console.error('Erro ao carregar catálogo:', err.message);
-    } finally {
-      setLoading(false);
-    }
+    if (!error) setEquipamentos(data || []);
+    setLoading(false);
   }
 
   useEffect(() => {
-    carregarCatalogo();
+    fetchEquipamentos();
   }, []);
 
-  const categorias = ['Todos', 'Laboratório', 'Multimídia', 'Informática', 'Fotografia', 'Áudio', 'Vídeo'];
-
-  const itensFiltrados = equipamentos.filter(item => {
-    const nome = item.nome || "";
-    const marca = item.marca || "";
-    const modelo = item.modelo || "";
-    const termo = `${nome} ${marca} ${modelo}`.toLowerCase();
-    
-    const passaBusca = termo.includes(busca.toLowerCase());
-    const passaCategoria = categoriaFiltrada === '' || categoriaFiltrada === 'Todos' || item.categoria === categoriaFiltrada;
-
-    return passaBusca && passaCategoria;
-  });
+  const itensFiltrados = abaAtiva === 'Todos'
+    ? equipamentos
+    : equipamentos.filter(item => item.categoria === abaAtiva);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white selection:bg-[#C5A059] selection:text-black overflow-x-hidden">
+    <div className="min-h-screen bg-[#0A0A0A] text-white selection:bg-[#C5A059] selection:text-black overflow-x-hidden font-sans">
       
-      {/* --- CAMADAS DE FUNDO (Idênticas à Home) --- */}
+      {/* --- CAMADAS DE FUNDO INSTITUCIONAIS --- */}
       <div className="fixed inset-0 z-0 opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
-      <div className="fixed top-0 left-1/4 w-[500px] h-[500px] bg-[#C5A059]/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="fixed top-0 left-1/4 w-[500px] h-[500px] bg-[#C5A059]/5 rounded-full blur-[140px] pointer-events-none" />
 
-      {/* --- NAVEGAÇÃO --- */}
-      <nav className="relative z-50 flex justify-between items-center px-8 py-6 max-w-7xl mx-auto">
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="text-2xl font-black tracking-tighter"
-        >
-          <Link href="/">
+      {/* HEADER PREMIUM */}
+      <header className="relative z-40 bg-[#0A0A0A]/80 backdrop-blur-md sticky top-0 border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
+          <Link href="/" className="text-2xl font-black tracking-tighter">
             UP<span className="text-[#C5A059]">LOC</span>
           </Link>
+          
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Modo Simulação</p>
+              <p className="text-xs text-zinc-500">Acesso de Consulta</p>
+            </div>
+            <div className="w-10 h-10 bg-gradient-to-br from-[#C5A059]/20 to-[#8c713d]/20 rounded-full flex items-center justify-center text-[#C5A059] font-black text-xs border border-[#C5A059]/30">
+              EA
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="relative z-10 max-w-7xl mx-auto px-8 py-12">
+        
+        {/* TÍTULO E BOTÃO VOLTAR */}
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mb-12 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <button 
+              onClick={() => router.push('/home')} 
+              className="flex items-center justify-center w-12 h-12 rounded-full bg-[#121212] border border-white/5 text-zinc-400 hover:text-[#C5A059] hover:border-[#C5A059]/30 transition-all text-sm backdrop-blur-md"
+              title="Voltar para a Home"
+            >
+              ←
+            </button>
+            <div>
+              <span className="block text-[9px] font-black uppercase text-[#C5A059] tracking-[0.3em] mb-1">Visualização do Acervo</span>
+              <h1 className="text-3xl md:text-4xl font-light tracking-tight">
+                Catálogo de <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-[#C5A059]">Equipamentos</span>
+              </h1>
+            </div>
+          </div>
         </motion.div>
 
-        <div className="hidden lg:flex gap-10 text-[10px] uppercase tracking-[0.3em] font-bold text-gray-500">
-          <Link href="/catalogo" className="text-white transition-colors">Catálogo Geral</Link>
-          <a href="#" className="hover:text-white transition-colors">Como Funciona</a>
-          <a href="#" className="hover:text-white transition-colors">Termos de Uso</a>
+        {/* ABAS DE CATEGORIAS */}
+        <div className="flex gap-2 mb-10 overflow-x-auto border-b border-white/5 no-scrollbar">
+          {CATEGORIAS.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setAbaAtiva(cat)}
+              className={`px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap relative ${
+                abaAtiva === cat ? 'text-[#C5A059]' : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              {cat}
+              {abaAtiva === cat && (
+                <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#C5A059]" />
+              )}
+            </button>
+          ))}
         </div>
 
-        <Link href="/login">
-          <div className="group relative px-6 py-2 overflow-hidden border border-[#C5A059]/30 rounded-full cursor-pointer">
-            <span className="relative z-10 text-[10px] uppercase tracking-widest text-[#C5A059] group-hover:text-black transition-colors duration-300">
-              Área do Professor
-            </span>
-            <div className="absolute inset-0 bg-[#C5A059] translate-y-[101%] group-hover:translate-y-0 transition-transform duration-300" />
-          </div>
-        </Link>
-      </nav>
-
-      {/* --- CORPO PRINCIPAL --- */}
-      <main className="relative z-10 max-w-7xl mx-auto px-8 pt-6 pb-24">
-        
-        {/* TÍTULO DA PÁGINA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
-        >
-          <span className="inline-block px-3 py-1 border border-[#C5A059]/20 bg-[#C5A059]/5 text-[#C5A059] text-[9px] uppercase tracking-[0.4em] font-bold rounded-md mb-4">
-            Consulta de Acervo Acadêmico
-          </span>
-          <h1 className="text-4xl md:text-5xl font-light tracking-tight">
-            Catálogo de <span className="font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-[#C5A059] to-[#8c713d]">Equipamentos</span>
-          </h1>
-          <p className="text-gray-500 text-xs uppercase tracking-widest mt-2">Modo Consulta (Apenas Visualização)</p>
-        </motion.div>
-
-        {/* BARRA DE FILTROS */}
-        <section className="mb-12 bg-[#121212]/60 border border-white/5 p-6 rounded-2xl flex flex-col md:flex-row items-center gap-6 backdrop-blur-md">
-          <div className="w-full md:flex-1">
-            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#C5A059] mb-2 block ml-1">O que você procura?</label>
-            <input 
-              type="text" 
-              placeholder="Ex: Câmera Sony, Microfone Lapela..." 
-              value={busca} 
-              onChange={(e) => setBusca(e.target.value)} 
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-[#C5A059]/50 placeholder:text-zinc-600 transition-colors h-[48px]" 
-            />
-          </div>
-
-          <div className="w-full md:w-[280px]">
-            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[#C5A059] mb-2 block ml-1">Filtrar Categoria</label>
-            <select 
-              value={categoriaFiltrada} 
-              onChange={(e) => setCategoriaFiltrada(e.target.value)}
-              className="w-full rounded-xl bg-black/40 border border-white/10 px-4 py-3 text-sm text-gray-400 focus:outline-none focus:border-[#C5A059]/50 transition-colors cursor-pointer h-[48px] appearance-none"
-            >
-              {categorias.map(cat => (
-                <option key={cat} value={cat === 'Todos' ? '' : cat} className="bg-[#0A0A0A] text-white">{cat}</option>
-              ))}
-            </select>
-          </div>
-        </section>
-
-        {/* GRID DE COMPONENTES */}
+        {/* GRID DE EQUIPAMENTOS */}
         {loading ? (
-          <div className="p-20 text-center text-[#C5A059] font-bold uppercase text-xs tracking-[0.3em] animate-pulse">
-            Carregando Acervo Digital...
+          <div className="text-center py-24 text-[#C5A059] animate-pulse font-black uppercase tracking-[0.2em] text-xs">
+            Carregando inventário acadêmico...
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {itensFiltrados.map((item) => (
-              <motion.div 
-                key={item.id} 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-gradient-to-br from-[#141414] to-[#0D0D0D] border border-white/5 rounded-2xl overflow-hidden shadow-xl hover:border-[#C5A059]/30 transition-all flex flex-col group relative"
+              <motion.div
+                layout 
+                key={item.id}
+                whileHover={{ y: -6 }}
+                onClick={() => setItemSelecionado(item)}
+                className="bg-[#121212]/50 rounded-[2rem] border border-white/5 overflow-hidden group cursor-pointer hover:border-[#C5A059]/20 transition-all duration-300 backdrop-blur-md flex flex-col justify-between"
               >
-                {/* CONTAINER DA IMAGEM */}
-                <div className="w-full h-48 bg-neutral-900 relative overflow-hidden flex-shrink-0 border-b border-white/5">
-                  <img 
-                    src={item.imagem || 'https://via.placeholder.com/400x300?text=Sem+Foto'} 
-                    alt={item.nome}
-                    className="w-full h-full object-cover opacity-70 group-hover:opacity-90 group-hover:scale-105 transition-all duration-500"
-                  />
+                <div>
+                  <div className="relative h-44 bg-neutral-900/50 flex items-center justify-center overflow-hidden border-b border-white/5">
+                    {item.imagem ? (
+                      <img src={item.imagem} alt={item.nome} className="w-full h-full object-cover opacity-40 group-hover:opacity-70 group-hover:scale-105 transition-all duration-700" />
+                    ) : (
+                      <div className="text-zinc-600 font-bold text-[10px] uppercase tracking-widest italic">Sem Imagem</div>
+                    )}
+                    <div className="absolute top-4 right-4">
+                      <span className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg text-[8px] font-black uppercase border border-white/10 text-[#C5A059] tracking-wider">
+                        {item.categoria}
+                      </span>
+                    </div>
+                  </div>
                   
-                  {/* TAG DE STATUS */}
-                  <div className="absolute top-3 right-3 z-10">
-                    <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border shadow-md ${
-                      item.status === 'manutencao' 
-                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' 
-                        : 'bg-green-500/10 text-green-400 border-green-500/20'
-                    }`}>
-                      {item.status === 'manutencao' ? 'Em Manutenção' : 'Disponível'}
-                    </span>
+                  <div className="p-6 pb-0">
+                    <h3 className="font-bold text-base text-white tracking-tight line-clamp-2 group-hover:text-[#C5A059] transition-colors duration-300 min-h-[3rem]">
+                      {item.nome}
+                    </h3>
+                    <p className="text-zinc-500 text-[9px] font-black uppercase tracking-widest mt-2 truncate">
+                      {item.marca && item.modelo ? `${item.marca} • ${item.modelo}` : 'Especificação Técnica'}
+                    </p>
                   </div>
                 </div>
 
-                {/* DETALHES DO PRODUTO */}
-                <div className="p-5 flex-1 flex flex-col justify-between bg-black/20">
-                  <div>
-                    <span className="text-[9px] font-black text-[#C5A059] uppercase tracking-[0.2em] block mb-1">
-                      {item.categoria || 'Geral'}
+                <div className="p-6">
+                  <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                    <span className="text-[8px] font-mono font-bold text-zinc-500 tracking-wider">
+                      {item.patrimonio ? `PAT: ${item.patrimonio}` : 'SIMULAÇÃO'}
                     </span>
-                    <h3 className="text-white font-bold text-base leading-snug tracking-wide group-hover:text-[#C5A059] transition-colors">
-                      {item.nome}
-                    </h3>
-                    <p className="text-gray-500 text-xs mt-1 font-light">
-                      {item.marca} {item.modelo ? `• ${item.modelo}` : ''}
-                    </p>
-                  </div>
-
-                  {/* ESTADO DE CONSERVAÇÃO */}
-                  <div className="mt-5 pt-3 border-t border-white/5 flex items-center justify-between text-[9px] uppercase font-bold text-gray-400 tracking-widest">
-                    <span>Condição:</span>
-                    <span className="text-gray-300 font-normal">{item.estado_conservacao || 'Excelente'}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">{item.estado_conservacao || 'Disponível'}</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                    </div>
                   </div>
                 </div>
               </motion.div>
             ))}
-          </div>
-        )}
-
-        {/* FEEDBACK CASO VAZIO */}
-        {!loading && itensFiltrados.length === 0 && (
-          <div className="p-20 text-center bg-[#111] rounded-2xl border border-white/5 text-gray-500 font-bold uppercase text-xs tracking-widest">
-            Nenhum equipamento foi encontrado para os termos filtrados.
-          </div>
+          </motion.div>
         )}
       </main>
 
-      {/* FOOTER */}
-      <footer className="px-8 py-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 relative z-10 bg-[#0A0A0A]">
-        <div className="text-[9px] text-gray-600 tracking-[0.4em] uppercase font-medium">
-          © 2026 UPLOC — Tecnologia para o Futuro do Audiovisual
-        </div>
-      </footer>
+      {/* MODAL EXCLUSIVO DE VISUALIZAÇÃO E ESPECIFICAÇÕES */}
+      <AnimatePresence>
+        {itemSelecionado && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/95 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, y: 15, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 15, opacity: 0 }}
+              className="bg-[#121212] w-full max-w-xl rounded-[2.5rem] border border-white/10 shadow-3xl overflow-hidden max-h-[90vh] overflow-y-auto no-scrollbar"
+            >
+              <div className="h-48 bg-neutral-900 relative border-b border-white/5">
+                {itemSelecionado.imagem && <img src={itemSelecionado.imagem} className="w-full h-full object-cover opacity-30" alt="" />}
+                <button onClick={() => setItemSelecionado(null)} className="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/60 flex items-center justify-center border border-white/10 hover:bg-[#C5A059] hover:text-black transition-all z-20 text-xs">✕</button>
+                <div className="absolute bottom-4 left-8 z-10">
+                  <span className="px-3 py-1 bg-[#C5A059] rounded-md text-[8px] font-black uppercase text-black tracking-widest">{itemSelecionado.categoria}</span>
+                </div>
+              </div>
+
+              <div className="p-8 md:p-10 pt-6 relative z-10">
+                <span className="text-[8px] font-black uppercase text-zinc-500 tracking-[0.2em] block mb-1">Visualização do Dispositivo</span>
+                <h2 className="text-white text-3xl font-light tracking-tight mb-6">
+                  <span className="font-black text-[#C5A059]">{itemSelecionado.nome}</span>
+                </h2>
+                
+                {/* BLOCo DE ESPECIFICAÇÕES DETALHADAS */}
+                <div className="p-6 bg-black/40 rounded-2xl border border-white/5 grid grid-cols-2 gap-x-6 gap-y-4 text-xs font-light text-zinc-300">
+                  <div>
+                    <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-widest mb-1">Marca / Fabricante</span> 
+                    <span className="font-medium text-white">{itemSelecionado.marca || 'Não informada'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-widest mb-1">Modelo Comercial</span> 
+                    <span className="font-medium text-white">{itemSelecionado.modelo || 'Não informado'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-widest mb-1">Código de Patrimônio</span> 
+                    <span className="font-mono font-bold text-white">{itemSelecionado.patrimonio || 'Simulado'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-widest mb-1">Nº de Série Técnico</span> 
+                    <span className="font-mono text-zinc-400">{itemSelecionado.numero_serie || '—'}</span>
+                  </div>
+                  <div className="col-span-2 border-t border-white/5 pt-4">
+                    <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-widest mb-1">Status Operacional</span> 
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                      <span className="text-green-400 font-bold uppercase text-[10px] tracking-wider">Disponível para Alocação (Produção)</span>
+                    </div>
+                  </div>
+                  
+                  {itemSelecionado.observacoes && (
+                    <div className="col-span-2 border-t border-white/5 pt-4">
+                      <span className="text-zinc-500 font-bold uppercase block text-[8px] tracking-widest mb-1">Notas de Configuração</span>
+                      <p className="text-zinc-400 italic text-[11px] leading-relaxed font-light">{itemSelecionado.observacoes}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Nota informativa de rodapé do modal */}
+                <p className="text-center text-zinc-600 text-[10px] mt-8 tracking-wide italic">
+                  * Agendamentos reais exigem autenticação do corpo docente na Área do Professor.
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
